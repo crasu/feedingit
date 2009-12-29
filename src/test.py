@@ -64,13 +64,15 @@ class ListingDisplay(QtGui.QMainWindow):
         #self.add(listWidget)
         self.show()
 
-class RSSReader(QtGui.QMainWindow):    
+class FeedingIt(QtGui.QMainWindow):    
  
     def __init__(self, parent=None):
         QtGui.QMainWindow.__init__(self, parent)
         self.setWindowTitle('Feeding It')
-        self.setGeometry(100,100,300,300)
 
+        exit = QtGui.QAction(None, 'Exit', self)
+        exit.setStatusTip('Exit application')
+        self.connect(exit, QtCore.SIGNAL('triggered()'), QtCore.SLOT('close()'))
 
         self.mainWidget=QtGui.QWidget(self) # dummy widget to contain the
                                       # layout manager
@@ -84,7 +86,7 @@ class RSSReader(QtGui.QMainWindow):
         file = menubar.addAction(exitAction)
         
         self.listing=Listing()
-        self.listing.downloadFeeds()
+        self.displayListing() 
         
         listOfFeeds = QtGui.QListWidget(self.mainWidget)
         
@@ -97,13 +99,42 @@ class RSSReader(QtGui.QMainWindow):
         #layout.addWidget(listOfFeeds) 
         #self.setLayout(layout)
  
-if __name__ == '__main__':    
+    def displayListing(self):
+        #try:
+        #    self.window.remove(self.pannableListing)
+        #except:
+        #    pass
+        #self.vboxListing = gtk.VBox(False,10)
+        #self.pannableListing = hildon.PannableArea()
+        #self.pannableListing.add_with_viewport(self.vboxListing)
+
+        for key in self.listing.getListOfFeeds():
+            #button = gtk.Button(item)
+            #button = hildon.Button(gtk.HILDON_SIZE_AUTO_WIDTH | gtk.HILDON_SIZE_FINGER_HEIGHT,
+            #                  hildon.BUTTON_ARRANGEMENT_VERTICAL)
+            #button.set_text(self.listing.getFeedTitle(key), self.listing.getFeedUpdateTime(key))
+            #button.set_alignment(0,0,1,1)
+            #button.connect("clicked", self.buttonFeedClicked, self, self.window, key)
+            #self.vboxListing.pack_start(button, expand=False)
+            pass
+        #self.window.add(self.pannableListing)
+        #self.window.show_all()
+        
+if __name__ == '__main__': 
+
+    # Checking the configuration directory does exist
+    if not isdir(CONFIGDIR):
+        try:
+            mkdir(CONFIGDIR)
+        except:
+            print "Error: Can't create configuration directory"
+            sys.exit(1)
  
     #Creating Qt application
     app = QtGui.QApplication(sys.argv)
  
-    myRSSReader = RSSReader()
-    myRSSReader.show()
+    feedingIt = FeedingIt()
+    feedingIt.show()
  
-    #Initing application
+    #Starting the application's main loop
     sys.exit(app.exec_())
