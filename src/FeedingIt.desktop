@@ -1,0 +1,7 @@
+[Desktop Entry]
+Encoding=UTF-8
+Version=0.10
+Type=Application
+Name=FeedingIt
+Exec=/usr/bin/FeedingIt
+Icon=xournal

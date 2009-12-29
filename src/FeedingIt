@@ -1,0 +1,3 @@
+#!/bin/sh
+cd /opt/FeedingIt
+python2.5 FeedingIt.py

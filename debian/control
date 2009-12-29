@@ -1,0 +1,12 @@
+Source: feedingit
+Section: unknown
+Priority: extra
+Maintainer: unknown <yves@marcoz.org>
+Build-Depends: debhelper (>= 5)
+Standards-Version: 3.7.2
+
+Package: feedingit
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, python-gtkhtml2, python
+Description: Simple RSS Reader
+ Simple RSS Reader, based on feedparser.py
