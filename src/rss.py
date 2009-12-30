@@ -23,6 +23,11 @@
 # Description : PyGtk Example 
 # ============================================================================
 
+from os.path import isfile
+from os.path import isdir
+import pickle
+import md5
+
 CONFIGDIR="/home/user/.feedingit/"
 
 def getId(string):
