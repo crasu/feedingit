@@ -3,6 +3,7 @@ from PyQt4 import QtGui
 from PyQt4 import QtCore
 from PyQt4.QtWebKit import QWebView
 import feedparser
+from QtGui import SIGNAL
 
 class Feed:
     def __init__(self, url):
@@ -88,12 +89,12 @@ class FeedingIt(QtGui.QMainWindow):
         self.listing=Listing()
         self.displayListing() 
         
-        listOfFeeds = QtGui.QListWidget(self.mainWidget)
+        #listOfFeeds = QtGui.QListWidget(self.mainWidget)
         
-        tmp = ["test","test1", "test2"]
+        #tmp = ["test","test1", "test2"]
         #for item in self.listing.getListOfFeeds():
-        for item in tmp:
-            QtGui.QListWidgetItem(item, listOfFeeds)
+        #for item in tmp:
+        #    QtGui.QListWidgetItem(item, listOfFeeds)
         
         #layout = QtGui.QVBoxLayout()
         #layout.addWidget(listOfFeeds) 
@@ -109,6 +110,11 @@ class FeedingIt(QtGui.QMainWindow):
         #self.pannableListing.add_with_viewport(self.vboxListing)
 
         for key in self.listing.getListOfFeeds():
+            # Create the button for the feed
+	    button = QtGui.QPushButton(self.listing.getFeedTitle(key), self)
+	    button.setObjectName(key)
+	    self.connect(button, SIGNAL("clicked()"), self.buttonFeedClicked)
+
             #button = gtk.Button(item)
             #button = hildon.Button(gtk.HILDON_SIZE_AUTO_WIDTH | gtk.HILDON_SIZE_FINGER_HEIGHT,
             #                  hildon.BUTTON_ARRANGEMENT_VERTICAL)
@@ -119,6 +125,10 @@ class FeedingIt(QtGui.QMainWindow):
             pass
         #self.window.add(self.pannableListing)
         #self.window.show_all()
+        
+    def buttonFeedClicked(self):
+	key = self.sender().objectName()
+        self.displayFeed(key)
         
 if __name__ == '__main__': 
 
