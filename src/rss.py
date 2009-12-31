@@ -27,6 +27,8 @@ from os.path import isfile
 from os.path import isdir
 import pickle
 import md5
+import feedparser
+import time
 
 CONFIGDIR="/home/user/.feedingit/"
 

@@ -2,7 +2,6 @@ import sys
 from PyQt4 import QtGui
 from PyQt4 import QtCore
 from PyQt4.QtWebKit import QWebView
-import feedparser
 import rss
 from rss import *
 
@@ -15,12 +14,16 @@ class ArticleDisplay(QtGui.QMainWindow):
         #self.setWindowTitle('Feeding It')
         
         text = feed.getArticle(index)
-        web = QWebView()
-        web.set_html(text)
-        web.show()
-        
+        self.web = QWebView()
+        self.connect(self.web,QtCore.SIGNAL("linkClicked(QUrl)"), self.linkClicked)
+        self.web.setHtml(text)
+        self.setCentralWidget(self.web)
         self.show()
-  
+        
+    def linkClicked(self, link):
+	self.web.load(link)
+	self.show()
+        
 class ListingDisplay(QtGui.QMainWindow):  
     def __init__(self, parent, feed):
         QtGui.QMainWindow.__init__(self, parent)
@@ -43,29 +46,47 @@ class FeedDisplay(QtGui.QMainWindow):
         QtGui.QMainWindow.__init__(self, parent)
         self.setWindowTitle(self.title)
         
-        self.mainWidget=QtGui.QWidget(self) # dummy widget to contain the
+        #self.mainWidget=QtGui.QScrollArea(self) # dummy widget to contain the
                                       # layout manager
-        self.setCentralWidget(self.mainWidget)
-        self.mainLayout=QtGui.QVBoxLayout(self.mainWidget)
-        self.mainLayout.setSizeConstraint(1)
+        #self.setCentralWidget(self.mainWidget)
+        #self.mainLayout=QtGui.QVBoxLayout()
         self.displayFeed()
-        print self.mainLayout.resizeMode
+        #self.mainWidget.setWidget(self.mainLayout)
         self.show()
         
     def displayFeed(self):
+	#1 = Working version with QListWidget
+	self.articles = []
+	self.mainwidget = QtGui.QWidget()
+	self.scroll = QtGui.QScrollArea(self)
+	self.layout = QtGui.QVBoxLayout(self.mainwidget)
+	
+        #1 self.widgetList = QtGui.QListWidget(self)
+        #1 self.connect(self.widgetList, QtCore.SIGNAL("itemDoubleClicked(QListWidgetItem *)"), self.buttonArticleClicked)
+        #self.connect(self.widgetList, QtCore.SIGNAL("currentItemChanged(QListWidgetItem *)"), self.buttonArticleClicked)
+        #1 self.widgetList.setProperty("FingerScrollable", True)
         index = 0
         for item in self.feed.getEntries():
-            button = QtGui.QPushButton(item["title"], self)
+	    #1 widgetItem = QtGui.QListWidgetItem(item["title"])
+	    #1 self.articles.append(widgetItem)
+	    #1 self.widgetList.addItem(widgetItem)
+            button = QtGui.QPushButton(item["title"])
             button.setObjectName(str(index))
-            self.mainLayout.addWidget(button)
-            button.setFixedHeight(button.sizeHint().height())
+            self.layout.addWidget(button)
+            #button.setFixedHeight(button.sizeHint().height())
             self.connect(button, QtCore.SIGNAL("clicked()"), self.buttonArticleClicked)           
             index = index + 1
-        self.setFixedHeight(self.sizeHint().height())
+        #1 self.setCentralWidget(self.widgetList)
+        self.scroll.setWidget(self.mainwidget)
+        self.setCentralWidget(self.scroll)
             
     def buttonArticleClicked(self):
+        #index = self.articles.index(self.sender())
         index = int(self.sender().objectName())
-        
+        #print self.articles.index(item1)
+        #print "clicked"
+        #index = self.articles.index(item1)
+        self.articleDisplay = ArticleDisplay(self, self.feed, index)
 
 class FeedingIt(QtGui.QMainWindow):    
  
@@ -73,74 +94,59 @@ class FeedingIt(QtGui.QMainWindow):
         QtGui.QMainWindow.__init__(self, parent)
         self.setWindowTitle('Feeding It')
 
-        exit = QtGui.QAction('Exit', self)
-        exit.setStatusTip('Exit application')
-        self.connect(exit, QtCore.SIGNAL('triggered()'), QtCore.SLOT('close()'))
-
-        self.mainWidget=QtGui.QWidget(self) # dummy widget to contain the
-                                      # layout manager
-        self.setCentralWidget(self.mainWidget)
-        self.mainLayout=QtGui.QVBoxLayout(self.mainWidget)
+        update = QtGui.QAction('Update All Feeds', self)
+        update.setStatusTip('Update all feeds')
+        self.connect(update, QtCore.SIGNAL('triggered()'), self.updateAllFeeds)
+        menubar = self.menuBar()
+        file = menubar.addAction(update)
+        
+        add = QtGui.QAction('Add Feed', self)
+        self.connect(add, QtCore.SIGNAL('triggered()'), self.addFeedButtonClicked)
+        file = menubar.addAction(add)
 
         # Create MenuBar
         exitAction = QtGui.QAction('Exit', self)
         self.connect(exitAction, QtCore.SIGNAL('triggered()'), self.close)
-        menubar = self.menuBar()
         file = menubar.addAction(exitAction)
         
         self.listing=Listing()
         self.displayListing() 
+        self.show()
         
-        #listOfFeeds = QtGui.QListWidget(self.mainWidget)
+    def updateAllFeeds(self):
+        self.listing.updateFeeds()
+        self.displayListing()
         
-        #tmp = ["test","test1", "test2"]
-        #for item in self.listing.getListOfFeeds():
-        #for item in tmp:
-        #    QtGui.QListWidgetItem(item, listOfFeeds)
-        
-        #layout = QtGui.QVBoxLayout()
-        #layout.addWidget(listOfFeeds) 
-        #self.setLayout(layout)
- 
     def displayListing(self):
+        self.mainWidget=QtGui.QWidget(self) # dummy widget to contain the
+                                      # layout manager
+        self.setCentralWidget(self.mainWidget)
+        self.mainLayout=QtGui.QVBoxLayout(self.mainWidget)
+        
         for key in self.listing.getListOfFeeds():
             # Create the button for the feed
             button = QtGui.QPushButton(self.listing.getFeedTitle(key), self)
             button.setObjectName(key)
             self.mainLayout.addWidget(button)
             self.connect(button, QtCore.SIGNAL("clicked()"), self.buttonFeedClicked)
-            
+        self.show()
             
     def displayFeed(self, qtKey):
         key = str(qtKey)
         self.feedDisplay = FeedDisplay(self.listing.getFeed(key), self.listing.getFeedTitle(key), self)
-        # Initialize the feed panel
-        #self.vboxFeed = gtk.VBox(False, 10)
-        #self.pannableFeed = hildon.PannableArea()
-        #self.pannableFeed.add_with_viewport(self.vboxFeed)
-        
-        #index = 0
-        #for item in self.listing.getFeed(key).getEntries():
-            
-            #button = hildon.Button(gtk.HILDON_SIZE_AUTO_WIDTH | gtk.HILDON_SIZE_FINGER_HEIGHT,
-            #                  hildon.BUTTON_ARRANGEMENT_HORIZONTAL)
-            #button.set_text(item["title"], time.strftime("%a, %d %b %Y %H:%M:%S",item["updated_parsed"]))
-            #button.set_text(item["title"], time.asctime(item["updated_parsed"]))
-            #button.set_text(item["title"],"")
-            #button.set_alignment(0,0,1,1)
-            #button.set_markup(True)
-            #button = gtk.Button(item["title"])
-            #button.set_alignment(0,0)
-            #label = button.child
-            #label.set_markup(item["title"])
-            #label.modify_font(pango.FontDescription("sans 16"))
-            #button.connect("clicked", self.button_clicked, self, self.window, key, index)
-            #self.vboxFeed.pack_start(button, expand=False)
-            #index=index+1
         
     def buttonFeedClicked(self):
         key = self.sender().objectName()
         self.displayFeed(key)
+        
+    def addFeedButtonClicked(self):
+	 # Ask for Feed Name
+	 (title,ok) = QtGui.QInputDialog.getText(self, "Add Feed", "Enter the name of the new feed")
+	 if ok and title != "":
+	    (url, ok) = QtGui.QInputDialog.getText(self, "Add Feed", "Enter the URL of the new feed")
+	    if ok and url != "":
+	       self.listing.addFeed(title, url)
+	 self.displayListing()
         
 if __name__ == '__main__': 
 
@@ -156,7 +162,6 @@ if __name__ == '__main__':
     app = QtGui.QApplication(sys.argv)
  
     feedingIt = FeedingIt()
-    feedingIt.show()
  
     #Starting the application's main loop
     sys.exit(app.exec_())
