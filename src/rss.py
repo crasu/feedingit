@@ -45,11 +45,13 @@ class Feed:
         #self.feed=feedparser.parse(url)
     
     def updateFeed(self):
-        self.feed=feedparser.parse(self.url)
-        self.updateTime = time.asctime()
-        file = open(CONFIGDIR+getId(self.name), "w")
-        pickle.dump(self, file )
-        file.close()
+        tmp=feedparser.parse(self.url)
+        if len(tmp["entries"])>0:
+           self.feed = tmp
+	   self.updateTime = time.asctime()
+           file = open(CONFIGDIR+getId(self.name), "w")
+           pickle.dump(self, file )
+           file.close()
     
     def getUpdateTime(self):
         return self.updateTime

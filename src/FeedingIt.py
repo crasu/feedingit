@@ -35,6 +35,7 @@ from os.path import isfile, isdir
 from os import mkdir
 import md5
 import sys   
+import urllib2
 
 from rss import *
    
@@ -182,6 +183,7 @@ class FeedingIt:
             #label.set_markup(item["title"])
             label.modify_font(pango.FontDescription("sans 16"))
             button.connect("clicked", self.button_clicked, self, self.window, key, index)
+            
             self.vboxFeed.pack_start(button, expand=False)
             index=index+1
 
@@ -191,37 +193,45 @@ class FeedingIt:
     def displayArticle(self, key, index):
         text = self.listing.getFeed(key).getArticle(index)
         self.articleWindow = hildon.StackableWindow()
+
         # Init the article display    
         self.view = gtkhtml2.View()
+        self.pannable_article = hildon.PannableArea()
+        self.pannable_article.add(self.view)
         self.document = gtkhtml2.Document()
         self.view.set_document(self.document)
-        self.pannable_article = hildon.PannableArea()
         
-        #self.view.connect("on_url", self._signal_on_url)
-        self.document.connect("link_clicked", self._signal_link_clicked)
-        #self.document.connect("request-url", self._signal_request_url)
-
         self.document.clear()
         self.document.open_stream("text/html")
         self.document.write_stream(text)
         self.document.close_stream()
         
-        self.pannable_article.add_with_viewport(self.view)
         self.articleWindow.add(self.pannable_article)
+        
         self.articleWindow.show_all()
+        
+        self.document.connect("link_clicked", self._signal_link_clicked)
+        self.document.connect("request-url", self._signal_request_url)
+        
+        self.document.open_stream("text/html")
+        self.document.write_stream(text)
+        self.document.close_stream()
+        self.document.show()
      
+    def tap(self):
+	 pass
 #    def _signal_on_url(self, object, url):
 #        if url == None: url = ""
 #        else: url = self._complete_url(url)
         #self.emit("status_changed", url)
 
     def _signal_link_clicked(self, object, link):
-        #self.emit("open_uri", self._complete_url(link))
-        #os.spawnl(os.P_NOWAIT, '/usr/bin/browser', '/usr/bin/browser', '--url', link)
         webbrowser.open(link)
 
-#    def _signal_request_url(self, object, url, stream):
-#        stream.write(self._fetch_url(self._complete_url(url)))
+    def _signal_request_url(self, object, url, stream):
+        f = urllib2.urlopen(url)
+        stream.write(f.read())
+        stream.close()
 #        
 #    def _complete_url(self, url):
 #        import string, urlparse, urllib
