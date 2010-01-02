@@ -25,6 +25,7 @@
 
 from os.path import isfile
 from os.path import isdir
+from os import remove
 import pickle
 import md5
 import feedparser
@@ -70,10 +71,22 @@ class Feed:
     
     def getArticle(self, index):
         entry = self.feed["entries"][index]
-        text = "<h4><a href=\"" + entry["link"] + "\">" + entry["title"] + "</a></h4>"
-        text = text + "<small><i>Date: " + time.strftime("%a, %d %b %Y %H:%M:%S",entry["updated_parsed"]) + "</i></small>"
-        text = text + "<BR />"
-        text = text + entry["summary"]
+        title = entry.get('title', 'No title')
+        #content = entry.get('content', entry.get('summary_detail', {}))
+        if entry.has_key('content'):
+            content = entry.content[0].value
+        else:
+            content = entry.get('summary', '')
+        #print content.keys()
+        #.get('value', "No Data")
+        link = entry.get('link', 'NoLink')
+        date = time.strftime("%a, %d %b %Y %H:%M:%S",entry["updated_parsed"])
+        #text = '''<div style="color: black; background-color: white;">'''
+        text = '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>'
+        text = text + '<div><a href=\"' + link + '\">' + title + "</a>"
+        text = text + "<BR /><small><i>Date: " + date + "</i></small></div>"
+        text = text + "<BR /><BR />"
+        text = text + content
         return text    
     
 class Listing:
@@ -102,6 +115,12 @@ class Listing:
         self.listOfFeeds[getId(title)] = {"title":title, "url":url}
         self.saveConfig()
         self.feeds[getId(title)] = Feed(title, url)
+        
+    def removeFeed(self, key):
+        del self.listOfFeeds[key]
+        del self.feeds[key]
+        if isfile(CONFIGDIR+key):
+           remove(CONFIGDIR+key)
     
     def saveConfig(self):
         file = open(CONFIGDIR+"feeds.pickle", "w")

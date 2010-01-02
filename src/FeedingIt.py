@@ -19,7 +19,7 @@
 # ============================================================================
 # Name        : FeedingIt.py
 # Author      : Yves Marcoz
-# Version     : 0.1
+# Version     : 0.1.1
 # Description : PyGtk Example 
 # ============================================================================
 
@@ -33,9 +33,10 @@ import webbrowser
 import pickle
 from os.path import isfile, isdir
 from os import mkdir
-import md5
 import sys   
 import urllib2
+import gobject
+from portrait import FremantleRotation
 
 from rss import *
    
@@ -67,18 +68,15 @@ class AddWidgetWizard(hildon.WizardDialog):
         self.set_forward_page_func(self.some_page_func)
    
         self.show_all()
-        print dir(self)
         
     def getData(self):
         return (self.nameEntry.get_text(), self.urlEntry.get_text())
         
     def on_page_switch(self, notebook, page, num, dialog):
-        print >>sys.stderr, "Page %d" % num
         return True
    
     def some_page_func(self, nb, current, userdata):
         # Validate data for 1st page
-        print current
         if current == 0:
             entry = nb.get_nth_page(current)
             # Check the name is not null
@@ -86,17 +84,28 @@ class AddWidgetWizard(hildon.WizardDialog):
         elif current == 1:
             entry = nb.get_nth_page(current)
             # Check the url is not null, and starts with http
-            print ( (len(entry.get_text()) != 0) and (entry.get_text().startswith("http")) )
             return ( (len(entry.get_text()) != 0) and (entry.get_text().startswith("http")) )
         elif current != 2:
             return False
         else:
             return True
 
+class DisplayFeed(hildon.StackableWindow):
+    def __init__(self, listing, key):
+        hildon.StackableWindow.__init__(self)
+        self.listing = listing
+        self.key = key
+        
+    
+
 class FeedingIt:
     def __init__(self):
+        self.listing = Listing()
+        
         # Init the windows
         self.window = hildon.StackableWindow()
+        self.window.set_title("FeedingIt")
+        FremantleRotation("FeedingIt", main_window=self.window)
         menu = hildon.AppMenu()
         # Create a button and add it to the menu
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
@@ -108,13 +117,18 @@ class FeedingIt:
         button.connect("clicked", self.button_add_clicked)
         menu.append(button)
         
+        button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
+        button.set_label("Delete Feed")
+        #button.set_selector(self.create_selector())
+        button.connect("clicked", self.button_delete_clicked)
+        menu.append(button)
+        
         self.window.set_app_menu(menu)
         menu.show_all()
         
         self.feedWindow = hildon.StackableWindow()
         self.articleWindow = hildon.StackableWindow()
 
-        self.listing = Listing()
         #self.listing.downloadFeeds()
         self.displayListing() 
         
@@ -132,13 +146,55 @@ class FeedingIt:
         self.displayListing()
         
     def button_update_clicked(self, button, key):
-        hildon.hildon_gtk_window_set_progress_indicator(self.window, 1)
+        #hildon.hildon_gtk_window_set_progress_indicator(self.window, 1)
         if key == "All":
             self.listing.updateFeeds()
         else:
             self.listing.getFeed(key).updateFeed()
+            self.displayFeed(key)            
         self.displayListing()
-        hildon.hildon_gtk_window_set_progress_indicator(self.window, 0)
+        #hildon.hildon_gtk_window_set_progress_indicator(self.window, 0)
+
+    def button_delete_clicked(self, button):
+        self.pickerDialog = hildon.PickerDialog(self.window)
+        #HildonPickerDialog
+        self.pickerDialog.set_selector(self.create_selector())
+        self.pickerDialog.show_all()
+        
+    def create_selector(self):
+        selector = hildon.TouchSelector(text=True)
+        # Selection multiple
+        #selector.set_column_selection_mode(hildon.TOUCH_SELECTOR_SELECTION_MODE_MULTIPLE)
+        self.mapping = {}
+        selector.connect("changed", self.selection_changed)
+
+        for key in self.listing.getListOfFeeds():
+            title=self.listing.getFeedTitle(key)
+            selector.append_text(title)
+            self.mapping[title]=key
+
+        return selector
+
+    def selection_changed(self, widget, data):
+        current_selection = widget.get_current_text()
+        #print 'Current selection: %s' % current_selection
+        #print "To Delete: %s" % self.mapping[current_selection]
+        self.pickerDialog.destroy()
+        if self.show_confirmation_note(self.window, current_selection):
+            self.listing.removeFeed(self.mapping[current_selection])
+        del self.mapping
+        self.displayListing()
+
+    def show_confirmation_note(self, parent, title):
+        note = hildon.Note("confirmation", parent, "Are you sure you want to delete " + title +"?")
+
+        retcode = gtk.Dialog.run(note)
+        note.destroy()
+        
+        if retcode == gtk.RESPONSE_OK:
+            return True
+        else:
+            return False
         
     def displayListing(self):
         try:
@@ -164,46 +220,67 @@ class FeedingIt:
         
     def displayFeed(self, key):
         # Initialize the feed panel
+        try:
+            self.feedWindow.destroy()
+        except:
+            pass
+        self.feedWindow.set_title(self.listing.getFeedTitle(key))
         self.vboxFeed = gtk.VBox(False, 10)
         self.pannableFeed = hildon.PannableArea()
         self.pannableFeed.add_with_viewport(self.vboxFeed)
+        self.pannableFeed.set_property("mov-mode", hildon.MOVEMENT_MODE_BOTH)
+        
+        menu = hildon.AppMenu()
+        # Create a button and add it to the menu
+        button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
+        button.set_label("Update Feed")
+        button.connect("clicked", self.button_update_clicked, key)
+        menu.append(button)
+        self.feedWindow.set_app_menu(menu)
+        menu.show_all()
         
         index = 0
         for item in self.listing.getFeed(key).getEntries():
-            #button = hildon.Button(gtk.HILDON_SIZE_AUTO_WIDTH | gtk.HILDON_SIZE_FINGER_HEIGHT,
-            #                  hildon.BUTTON_ARRANGEMENT_HORIZONTAL)
-            #button.set_text(item["title"], time.strftime("%a, %d %b %Y %H:%M:%S",item["updated_parsed"]))
-            #button.set_text(item["title"], time.asctime(item["updated_parsed"]))
-            #button.set_text(item["title"],"")
-            #button.set_alignment(0,0,1,1)
-            #button.set_markup(True)
             button = gtk.Button(item["title"])
             button.set_alignment(0,0)
             label = button.child
-            #label.set_markup(item["title"])
             label.modify_font(pango.FontDescription("sans 16"))
+            label.set_line_wrap(True)
+            
+            label.set_size_request(self.feedWindow.get_size()[0]-50, -1)
             button.connect("clicked", self.button_clicked, self, self.window, key, index)
             
-            self.vboxFeed.pack_start(button, expand=False)
+            self.vboxFeed.pack_start(button, expand=False)           
             index=index+1
 
         self.feedWindow.add(self.pannableFeed)
         self.feedWindow.show_all()
      
     def displayArticle(self, key, index):
-        text = self.listing.getFeed(key).getArticle(index)
+        self.text = self.listing.getFeed(key).getArticle(index)
         self.articleWindow = hildon.StackableWindow()
+        self.articleWindow.set_title(self.listing.getFeedTitle(key))
+        
+        menu = hildon.AppMenu()
+        # Create a button and add it to the menu
+        button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
+        button.set_label("Display Images")
+        button.connect("clicked", self.reloadArticle)
+        menu.append(button)
+        self.articleWindow.set_app_menu(menu)
+        menu.show_all()
 
         # Init the article display    
         self.view = gtkhtml2.View()
         self.pannable_article = hildon.PannableArea()
         self.pannable_article.add(self.view)
+        self.pannable_article.set_property("mov-mode", hildon.MOVEMENT_MODE_BOTH)
         self.document = gtkhtml2.Document()
         self.view.set_document(self.document)
         
         self.document.clear()
         self.document.open_stream("text/html")
-        self.document.write_stream(text)
+        self.document.write_stream(self.text)
         self.document.close_stream()
         
         self.articleWindow.add(self.pannable_article)
@@ -212,14 +289,13 @@ class FeedingIt:
         
         self.document.connect("link_clicked", self._signal_link_clicked)
         self.document.connect("request-url", self._signal_request_url)
+        #self.document.connect("ReloadArticle", self.reloadArticle)
         
+    def reloadArticle(self, widget):
         self.document.open_stream("text/html")
-        self.document.write_stream(text)
+        self.document.write_stream(self.text)
         self.document.close_stream()
-        self.document.show()
      
-    def tap(self):
-	 pass
 #    def _signal_on_url(self, object, url):
 #        if url == None: url = ""
 #        else: url = self._complete_url(url)
@@ -250,19 +326,21 @@ class FeedingIt:
 #    def _fetch_url(self, url, headers=[]):
 #        return self._open_url(url, headers).read()
         
-        
     def button_clicked(widget, button, app, window, key, index):
         app.displayArticle(key, index)
+        #app.document.emit("ReloadArticle")
     
     def buttonFeedClicked(widget, button, app, window, key):
         app.displayFeed(key)
      
     def run(self):
         self.window.connect("destroy", gtk.main_quit)
-        #self.window.show_all()
         gtk.main()
 
 if __name__ == "__main__":
+    #gobject.signal_new("ReloadArticle", gtkhtml2.Document,
+    #                   gobject.SIGNAL_RUN_LAST,
+    #                   gobject.TYPE_NONE, ())
     if not isdir(CONFIGDIR):
         try:
             mkdir(CONFIGDIR)
