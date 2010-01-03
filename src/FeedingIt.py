@@ -84,19 +84,122 @@ class AddWidgetWizard(hildon.WizardDialog):
         elif current == 1:
             entry = nb.get_nth_page(current)
             # Check the url is not null, and starts with http
-            return ( (len(entry.get_text()) != 0) and (entry.get_text().startswith("http")) )
+            return ( (len(entry.get_text()) != 0) and (entry.get_text().lower().startswith("http")) )
         elif current != 2:
             return False
         else:
             return True
 
-class DisplayFeed(hildon.StackableWindow):
-    def __init__(self, listing, key):
+class DisplayArticle(hildon.StackableWindow):
+    def __init__(self, title, text):
         hildon.StackableWindow.__init__(self)
-        self.listing = listing
-        self.key = key
+        self.text = text
+        self.set_title(title)
+
+        # Init the article display    
+        self.view = gtkhtml2.View()
+        self.pannable_article = hildon.PannableArea()
+        self.pannable_article.add(self.view)
+        self.pannable_article.set_property("mov-mode", hildon.MOVEMENT_MODE_BOTH)
+        self.document = gtkhtml2.Document()
+        self.view.set_document(self.document)
         
-    
+        self.document.clear()
+        self.document.open_stream("text/html")
+        self.document.write_stream(self.text)
+        self.document.close_stream()
+        
+        menu = hildon.AppMenu()
+        # Create a button and add it to the menu
+        button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
+        button.set_label("Display Images")
+        button.connect("clicked", self.reloadArticle)
+        menu.append(button)
+        self.set_app_menu(menu)
+        menu.show_all()
+        
+        self.add(self.pannable_article)
+        
+        self.show_all()
+        
+        self.document.connect("link_clicked", self._signal_link_clicked)
+        self.document.connect("request-url", self._signal_request_url)
+        #self.document.connect("ReloadArticle", self.reloadArticle)
+        self.connect("destroy", self.destroyWindow)
+        
+    def destroyWindow(self, *args):
+        self.destroy()
+        
+    def reloadArticle(self, widget):
+        self.document.open_stream("text/html")
+        self.document.write_stream(self.text)
+        self.document.close_stream()
+
+    def _signal_link_clicked(self, object, link):
+        webbrowser.open(link)
+
+    def _signal_request_url(self, object, url, stream):
+        f = urllib2.urlopen(url)
+        stream.write(f.read())
+        stream.close()
+
+
+class DisplayFeed(hildon.StackableWindow):
+    def __init__(self, feed, title):
+        hildon.StackableWindow.__init__(self)
+        self.feed = feed
+        self.feedTitle = title
+        self.set_title(title)
+        
+        menu = hildon.AppMenu()
+        button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
+        button.set_label("Update Feed")
+        button.connect("clicked", self.button_update_clicked)
+        menu.append(button)
+        self.set_app_menu(menu)
+        menu.show_all()
+        
+        self.displayFeed()
+        
+        self.connect("destroy", self.destroyWindow)
+        
+    def destroyWindow(self, *args):
+        self.destroy()
+
+    def displayFeed(self):
+        self.vboxFeed = gtk.VBox(False, 10)
+        self.pannableFeed = hildon.PannableArea()
+        self.pannableFeed.add_with_viewport(self.vboxFeed)
+        self.pannableFeed.set_property("mov-mode", hildon.MOVEMENT_MODE_BOTH)
+        
+        index = 0
+        for item in self.feed.getEntries():
+            button = gtk.Button(item["title"])
+            button.set_alignment(0,0)
+            label = button.child
+            label.modify_font(pango.FontDescription("sans 18"))
+            label.set_line_wrap(True)
+            
+            label.set_size_request(self.get_size()[0]-50, -1)
+            button.connect("clicked", self.button_clicked, index)
+            
+            self.vboxFeed.pack_start(button, expand=False)           
+            index=index+1
+
+        self.add(self.pannableFeed)
+        self.show_all()
+        
+    def clear(self):
+        self.remove(self.pannableFeed)
+        
+    def button_clicked(self, button, index):
+        disp = DisplayArticle(self.feedTitle, self.feed.getArticle(index))
+
+    def button_update_clicked(self, button):
+        self.listing.getFeed(key).updateFeed()
+        self.clear()
+        self.displayFeed(key)
+
 
 class FeedingIt:
     def __init__(self):
@@ -217,125 +320,14 @@ class FeedingIt:
             self.vboxListing.pack_start(button, expand=False)
         self.window.add(self.pannableListing)
         self.window.show_all()
-        
-    def displayFeed(self, key):
-        # Initialize the feed panel
-        try:
-            self.feedWindow.destroy()
-        except:
-            pass
-        self.feedWindow.set_title(self.listing.getFeedTitle(key))
-        self.vboxFeed = gtk.VBox(False, 10)
-        self.pannableFeed = hildon.PannableArea()
-        self.pannableFeed.add_with_viewport(self.vboxFeed)
-        self.pannableFeed.set_property("mov-mode", hildon.MOVEMENT_MODE_BOTH)
-        
-        menu = hildon.AppMenu()
-        # Create a button and add it to the menu
-        button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
-        button.set_label("Update Feed")
-        button.connect("clicked", self.button_update_clicked, key)
-        menu.append(button)
-        self.feedWindow.set_app_menu(menu)
-        menu.show_all()
-        
-        index = 0
-        for item in self.listing.getFeed(key).getEntries():
-            button = gtk.Button(item["title"])
-            button.set_alignment(0,0)
-            label = button.child
-            label.modify_font(pango.FontDescription("sans 16"))
-            label.set_line_wrap(True)
-            
-            label.set_size_request(self.feedWindow.get_size()[0]-50, -1)
-            button.connect("clicked", self.button_clicked, self, self.window, key, index)
-            
-            self.vboxFeed.pack_start(button, expand=False)           
-            index=index+1
-
-        self.feedWindow.add(self.pannableFeed)
-        self.feedWindow.show_all()
-     
-    def displayArticle(self, key, index):
-        self.text = self.listing.getFeed(key).getArticle(index)
-        self.articleWindow = hildon.StackableWindow()
-        self.articleWindow.set_title(self.listing.getFeedTitle(key))
-        
-        menu = hildon.AppMenu()
-        # Create a button and add it to the menu
-        button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
-        button.set_label("Display Images")
-        button.connect("clicked", self.reloadArticle)
-        menu.append(button)
-        self.articleWindow.set_app_menu(menu)
-        menu.show_all()
-
-        # Init the article display    
-        self.view = gtkhtml2.View()
-        self.pannable_article = hildon.PannableArea()
-        self.pannable_article.add(self.view)
-        self.pannable_article.set_property("mov-mode", hildon.MOVEMENT_MODE_BOTH)
-        self.document = gtkhtml2.Document()
-        self.view.set_document(self.document)
-        
-        self.document.clear()
-        self.document.open_stream("text/html")
-        self.document.write_stream(self.text)
-        self.document.close_stream()
-        
-        self.articleWindow.add(self.pannable_article)
-        
-        self.articleWindow.show_all()
-        
-        self.document.connect("link_clicked", self._signal_link_clicked)
-        self.document.connect("request-url", self._signal_request_url)
-        #self.document.connect("ReloadArticle", self.reloadArticle)
-        
-    def reloadArticle(self, widget):
-        self.document.open_stream("text/html")
-        self.document.write_stream(self.text)
-        self.document.close_stream()
-     
-#    def _signal_on_url(self, object, url):
-#        if url == None: url = ""
-#        else: url = self._complete_url(url)
-        #self.emit("status_changed", url)
-
-    def _signal_link_clicked(self, object, link):
-        webbrowser.open(link)
-
-    def _signal_request_url(self, object, url, stream):
-        f = urllib2.urlopen(url)
-        stream.write(f.read())
-        stream.close()
-#        
-#    def _complete_url(self, url):
-#        import string, urlparse, urllib
-#        url = urllib.quote(url, safe=string.punctuation)
-#        if urlparse.urlparse(url)[0] == '':
-#            return urlparse.urljoin(self.location, url)
-#        else:
-#            return url
-#        
-#    def _open_url(self, url, headers=[]):
-#        import urllib2
-#        opener = urllib2.build_opener()
-#        opener.addheaders = [('User-agent', 'Wikitin')]+headers
-#        return opener.open(url)
-#
-#    def _fetch_url(self, url, headers=[]):
-#        return self._open_url(url, headers).read()
-        
-    def button_clicked(widget, button, app, window, key, index):
-        app.displayArticle(key, index)
-        #app.document.emit("ReloadArticle")
     
-    def buttonFeedClicked(widget, button, app, window, key):
-        app.displayFeed(key)
+    def buttonFeedClicked(widget, button, self, window, key):
+        disp = DisplayFeed(self.listing.getFeed(key), self.listing.getFeedTitle(key))
      
     def run(self):
         self.window.connect("destroy", gtk.main_quit)
         gtk.main()
+
 
 if __name__ == "__main__":
     #gobject.signal_new("ReloadArticle", gtkhtml2.Document,
