@@ -91,8 +91,9 @@ class AddWidgetWizard(hildon.WizardDialog):
             return True
 
 class DisplayArticle(hildon.StackableWindow):
-    def __init__(self, title, text):
+    def __init__(self, title, text, index):
         hildon.StackableWindow.__init__(self)
+        self.index = index
         self.text = text
         self.set_title(title)
 
@@ -128,6 +129,7 @@ class DisplayArticle(hildon.StackableWindow):
         self.connect("destroy", self.destroyWindow)
         
     def destroyWindow(self, *args):
+        self.emit("article-closed", self.index)
         self.destroy()
         
     def reloadArticle(self, widget):
@@ -145,11 +147,12 @@ class DisplayArticle(hildon.StackableWindow):
 
 
 class DisplayFeed(hildon.StackableWindow):
-    def __init__(self, feed, title):
+    def __init__(self, feed, title, key):
         hildon.StackableWindow.__init__(self)
         self.feed = feed
         self.feedTitle = title
         self.set_title(title)
+        self.key=key
         
         menu = hildon.AppMenu()
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
@@ -164,6 +167,10 @@ class DisplayFeed(hildon.StackableWindow):
         self.connect("destroy", self.destroyWindow)
         
     def destroyWindow(self, *args):
+        for index in range(self.feed.getNumberOfEntries()):
+            self.feed.setEntryRead(index)
+        self.feed.saveFeed()
+        self.emit("feed-closed", self.key)
         self.destroy()
 
     def displayFeed(self):
@@ -171,17 +178,20 @@ class DisplayFeed(hildon.StackableWindow):
         self.pannableFeed = hildon.PannableArea()
         self.pannableFeed.add_with_viewport(self.vboxFeed)
         self.pannableFeed.set_property("mov-mode", hildon.MOVEMENT_MODE_BOTH)
-        
-        index = 0
-        for item in self.feed.getEntries():
-            button = gtk.Button(item["title"])
+        self.buttons = []
+        for index in range(self.feed.getNumberOfEntries()):
+            button = gtk.Button(self.feed.getTitle(index))
             button.set_alignment(0,0)
             label = button.child
-            label.modify_font(pango.FontDescription("sans 18"))
+            if self.feed.isEntryRead(index):
+                label.modify_font(pango.FontDescription("sans 18"))
+            else:
+                label.modify_font(pango.FontDescription("sans bold 18"))
             label.set_line_wrap(True)
             
             label.set_size_request(self.get_size()[0]-50, -1)
             button.connect("clicked", self.button_clicked, index)
+            self.buttons.append(button)
             
             self.vboxFeed.pack_start(button, expand=False)           
             index=index+1
@@ -193,7 +203,13 @@ class DisplayFeed(hildon.StackableWindow):
         self.remove(self.pannableFeed)
         
     def button_clicked(self, button, index):
-        disp = DisplayArticle(self.feedTitle, self.feed.getArticle(index))
+        disp = DisplayArticle(self.feedTitle, self.feed.getArticle(index), index)
+        disp.connect("article-closed", self.onArticleClosed)
+        
+    def onArticleClosed(self, object, index):
+        label = self.buttons[index].child
+        label.modify_font(pango.FontDescription("sans 18"))
+        self.buttons[index].show()
 
     def button_update_clicked(self, button):
         self.listing.getFeed(key).updateFeed()
@@ -303,21 +319,28 @@ class FeedingIt:
         self.pannableListing = hildon.PannableArea()
         self.pannableListing.add_with_viewport(self.vboxListing)
 
+        self.buttons = {}
         for key in self.listing.getListOfFeeds():
             #button = gtk.Button(item)
             button = hildon.Button(gtk.HILDON_SIZE_AUTO_WIDTH | gtk.HILDON_SIZE_FINGER_HEIGHT,
                               hildon.BUTTON_ARRANGEMENT_VERTICAL)
-            button.set_text(self.listing.getFeedTitle(key), self.listing.getFeedUpdateTime(key))
+            button.set_text(self.listing.getFeedTitle(key), self.listing.getFeedUpdateTime(key) + " / " 
+                            + str(self.listing.getFeedNumberOfUnreadItems(key)) + " Unread Items")
             button.set_alignment(0,0,1,1)
-            #label = button.child
-            #label.modify_font(pango.FontDescription("sans 10"))
             button.connect("clicked", self.buttonFeedClicked, self, self.window, key)
             self.vboxListing.pack_start(button, expand=False)
+            self.buttons[key] = button
         self.window.add(self.pannableListing)
         self.window.show_all()
     
     def buttonFeedClicked(widget, button, self, window, key):
-        disp = DisplayFeed(self.listing.getFeed(key), self.listing.getFeedTitle(key))
+        disp = DisplayFeed(self.listing.getFeed(key), self.listing.getFeedTitle(key), key)
+        disp.connect("feed-closed", self.onFeedClosed)
+        
+    def onFeedClosed(self, object, key):
+        self.buttons[key].set_text(self.listing.getFeedTitle(key), self.listing.getFeedUpdateTime(key) + " / " 
+                            + str(self.listing.getFeedNumberOfUnreadItems(key)) + " Unread Items")
+        self.buttons[key].show()
      
     def run(self):
         self.window.connect("destroy", gtk.main_quit)
@@ -325,6 +348,9 @@ class FeedingIt:
 
 
 if __name__ == "__main__":
+    gobject.signal_new("feed-closed", DisplayFeed, gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,))
+    gobject.signal_new("article-closed", DisplayArticle, gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,))
+    
     if not isdir(CONFIGDIR):
         try:
             mkdir(CONFIGDIR)

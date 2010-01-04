@@ -39,38 +39,67 @@ def getId(string):
 class Feed:
     # Contains all the info about a single feed (articles, ...), and expose the data
     def __init__(self, name, url):
-        self.feed = []
+        self.entries = []
+        self.readItems = {}
+        self.countUnread = 0
         self.name = name
         self.url = url
         self.updateTime = "Never"
-        #self.feed=feedparser.parse(url)
-    
+
+    def saveFeed(self):
+        file = open(CONFIGDIR+getId(self.name), "w")
+        pickle.dump(self, file )
+        file.close()
+
     def updateFeed(self):
         tmp=feedparser.parse(self.url)
+        # Check if the parse was succesful (number of entries > 0, else do nothing)
         if len(tmp["entries"])>0:
-           self.feed = tmp
-	   self.updateTime = time.asctime()
-           file = open(CONFIGDIR+getId(self.name), "w")
-           pickle.dump(self, file )
-           file.close()
+           self.updateTime = time.asctime()
+           self.entries = tmp["entries"]
+           # Initialize the new articles to unread
+           for index in range(self.getNumberOfEntries()):
+               if not self.readItems.has_key(self.getTitle(index)):
+                   self.countUnread = self.countUnread + 1
+                   self.readItems[self.getTitle(index)] = False
+           del tmp
+           self.saveFeed()
+    
+    def setEntryRead(self, index):
+        if self.readItems[self.getTitle(index)]==False:
+            self.countUnread = self.countUnread - 1
+            self.readItems[self.getTitle(index)] = True
+    
+    def isEntryRead(self, index):
+        return self.readItems[self.getTitle(index)]
+    
+    def getTitle(self, index):
+        return self.entries[index]["title"]
     
     def getUpdateTime(self):
         return self.updateTime
     
     def getEntries(self):
         try:
-            return self.feed["entries"]
+            return self.entries
         except:
             return []
     
+    def getNumberOfUnreadItems(self):
+        return self.countUnread
+    
+    def getNumberOfEntries(self):
+        return len(self.entries)
+    
     def getItem(self, index):
         try:
-            return self.feed["entries"][index]
+            return self.entries[index]
         except:
             return []
     
     def getArticle(self, index):
-        entry = self.feed["entries"][index]
+        self.setEntryRead(index)
+        entry = self.entries[index]
         title = entry.get('title', 'No title')
         #content = entry.get('content', entry.get('summary_detail', {}))
         if entry.has_key('content'):
@@ -88,10 +117,27 @@ class Feed:
         text = text + "<BR /><BR />"
         text = text + content
         return text    
-    
+
+
 class Listing:
     # Lists all the feeds in a dictionary, and expose the data
-    
+    def __init__(self):
+        self.feeds = {}
+        if isfile(CONFIGDIR+"feeds.pickle"):
+            file = open(CONFIGDIR+"feeds.pickle")
+            self.listOfFeeds = pickle.load(file)
+            file.close()
+        else:
+            self.listOfFeeds = {getId("Slashdot"):{"title":"Slashdot", "url":"http://rss.slashdot.org/Slashdot/slashdot"}, }
+        for key in self.listOfFeeds.keys():
+            if isfile(CONFIGDIR+key):
+                file = open(CONFIGDIR+key)
+                self.feeds[key] = pickle.load(file)
+                file.close()
+            else:
+                self.feeds[key] = Feed(self.listOfFeeds[key]["title"], self.listOfFeeds[key]["url"])
+        self.saveConfig()
+        
     def updateFeeds(self):
         for key in self.listOfFeeds.keys():
             self.feeds[key].updateFeed()
@@ -101,6 +147,9 @@ class Listing:
     
     def getFeedUpdateTime(self, key):
         return self.feeds[key].getUpdateTime()
+    
+    def getFeedNumberOfUnreadItems(self, key):
+        return self.feeds[key].getNumberOfUnreadItems()
    
     def getFeedTitle(self, key):
         return self.listOfFeeds[key]["title"]
@@ -126,20 +175,3 @@ class Listing:
         file = open(CONFIGDIR+"feeds.pickle", "w")
         pickle.dump(self.listOfFeeds, file)
         file.close()
-    
-    def __init__(self):
-        self.feeds = {}
-        if isfile(CONFIGDIR+"feeds.pickle"):
-            file = open(CONFIGDIR+"feeds.pickle")
-            self.listOfFeeds = pickle.load(file)
-            file.close()
-        else:
-            self.listOfFeeds = {getId("Slashdot"):{"title":"Slashdot", "url":"http://rss.slashdot.org/Slashdot/slashdot"}, }
-        for key in self.listOfFeeds.keys():
-            if isfile(CONFIGDIR+key):
-                file = open(CONFIGDIR+key)
-                self.feeds[key] = pickle.load(file)
-                file.close()
-            else:
-                self.feeds[key] = Feed(self.listOfFeeds[key]["title"], self.listOfFeeds[key]["url"])
-        self.saveConfig()
