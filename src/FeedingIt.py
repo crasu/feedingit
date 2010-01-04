@@ -222,7 +222,6 @@ class FeedingIt:
         
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
         button.set_label("Delete Feed")
-        #button.set_selector(self.create_selector())
         button.connect("clicked", self.button_delete_clicked)
         menu.append(button)
         
@@ -232,11 +231,7 @@ class FeedingIt:
         self.feedWindow = hildon.StackableWindow()
         self.articleWindow = hildon.StackableWindow()
 
-        #self.listing.downloadFeeds()
         self.displayListing() 
-        
-        #self.window.show_all()
-        #self.displayFeed(self.listing.getFeed(0))
         
     def button_add_clicked(self, button):
         wizard = AddWidgetWizard(self.window)
@@ -330,9 +325,6 @@ class FeedingIt:
 
 
 if __name__ == "__main__":
-    #gobject.signal_new("ReloadArticle", gtkhtml2.Document,
-    #                   gobject.SIGNAL_RUN_LAST,
-    #                   gobject.TYPE_NONE, ())
     if not isdir(CONFIGDIR):
         try:
             mkdir(CONFIGDIR)
