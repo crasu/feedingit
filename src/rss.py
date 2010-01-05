@@ -55,13 +55,19 @@ class Feed:
         tmp=feedparser.parse(self.url)
         # Check if the parse was succesful (number of entries > 0, else do nothing)
         if len(tmp["entries"])>0:
+           self.tmpReadItems = self.readItems
+           self.readItems = {}
            self.updateTime = time.asctime()
            self.entries = tmp["entries"]
+           self.countUnread = 0
            # Initialize the new articles to unread
            for index in range(self.getNumberOfEntries()):
-               if not self.readItems.has_key(self.getTitle(index)):
-                   self.countUnread = self.countUnread + 1
+               if not self.tmpReadItems.has_key(self.getTitle(index)):
                    self.readItems[self.getTitle(index)] = False
+               else:
+                   self.readItems[self.getTitle(index)] = self.tmpReadItems[self.getTitle(index)]
+               if self.readItems[self.getTitle(index)]==False:
+                  self.countUnread = self.countUnread + 1
            del tmp
            self.saveFeed()
     

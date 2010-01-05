@@ -125,7 +125,6 @@ class DisplayArticle(hildon.StackableWindow):
         
         self.document.connect("link_clicked", self._signal_link_clicked)
         self.document.connect("request-url", self._signal_request_url)
-        #self.document.connect("ReloadArticle", self.reloadArticle)
         self.connect("destroy", self.destroyWindow)
         
     def destroyWindow(self, *args):
@@ -159,6 +158,10 @@ class DisplayFeed(hildon.StackableWindow):
         button.set_label("Update Feed")
         button.connect("clicked", self.button_update_clicked)
         menu.append(button)
+        button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
+        button.set_label("Mark All As Read")
+        button.connect("clicked", self.buttonReadAllClicked)
+        menu.append(button)
         self.set_app_menu(menu)
         menu.show_all()
         
@@ -167,8 +170,6 @@ class DisplayFeed(hildon.StackableWindow):
         self.connect("destroy", self.destroyWindow)
         
     def destroyWindow(self, *args):
-        for index in range(self.feed.getNumberOfEntries()):
-            self.feed.setEntryRead(index)
         self.feed.saveFeed()
         self.emit("feed-closed", self.key)
         self.destroy()
@@ -184,9 +185,9 @@ class DisplayFeed(hildon.StackableWindow):
             button.set_alignment(0,0)
             label = button.child
             if self.feed.isEntryRead(index):
-                label.modify_font(pango.FontDescription("sans 18"))
+                label.modify_font(pango.FontDescription("sans 16"))
             else:
-                label.modify_font(pango.FontDescription("sans bold 18"))
+                label.modify_font(pango.FontDescription("sans bold 16"))
             label.set_line_wrap(True)
             
             label.set_size_request(self.get_size()[0]-50, -1)
@@ -208,13 +209,20 @@ class DisplayFeed(hildon.StackableWindow):
         
     def onArticleClosed(self, object, index):
         label = self.buttons[index].child
-        label.modify_font(pango.FontDescription("sans 18"))
+        label.modify_font(pango.FontDescription("sans 16"))
         self.buttons[index].show()
 
     def button_update_clicked(self, button):
         self.listing.getFeed(key).updateFeed()
         self.clear()
         self.displayFeed(key)
+        
+    def buttonReadAllClicked(self, button):
+        for index in range(self.feed.getNumberOfEntries()):
+            self.feed.setEntryRead(index)
+            label = self.buttons[index].child
+            label.modify_font(pango.FontDescription("sans 16"))
+            self.buttons[index].show()
 
 
 class FeedingIt:
@@ -325,7 +333,7 @@ class FeedingIt:
             button = hildon.Button(gtk.HILDON_SIZE_AUTO_WIDTH | gtk.HILDON_SIZE_FINGER_HEIGHT,
                               hildon.BUTTON_ARRANGEMENT_VERTICAL)
             button.set_text(self.listing.getFeedTitle(key), self.listing.getFeedUpdateTime(key) + " / " 
-                            + str(self.listing.getFeedNumberOfUnreadItems(key)) + " Unread Items")
+                            + str(self.listing.getFeedNumberOfUnreadItems(key)) + " Unread Items / " + str(self.listing.getFeed(key).getNumberOfEntries()))
             button.set_alignment(0,0,1,1)
             button.connect("clicked", self.buttonFeedClicked, self, self.window, key)
             self.vboxListing.pack_start(button, expand=False)

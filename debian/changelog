@@ -1,3 +1,9 @@
+feedingit (0.1.2-1) unstable; urgency=low
+
+  * Added read/unread support
+  
+ -- Yves <yves@marcoz.org>  Sun, 03 Jan 2010 23:09:19 -0800
+
 feedingit (0.1.1-1) unstable; urgency=low
 
   * Adding portrait mode support / Better gtk gui
