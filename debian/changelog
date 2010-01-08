@@ -1,3 +1,14 @@
+feedingit (0.1.3-1) unstable; urgency=low
+
+  * Added dbus service to add new feed (#4992)
+  * Fixed #4979, delete feed issue
+  * Fixed "Add Feed" dialog
+  * Added progress bar and multi-threading for downloading feeds
+  * Automatic loading of images in HTML feeds
+  * Use dbus to open up external browser
+  
+ -- Yves <yves@marcoz.org>  Thu, 07 Jan 2010 23:09:19 -0800
+
 feedingit (0.1.2-1) unstable; urgency=low
 
   * Added read/unread support

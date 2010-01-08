@@ -19,8 +19,8 @@
 # ============================================================================
 # Name        : FeedingIt.py
 # Author      : Yves Marcoz
-# Version     : 0.1.1
-# Description : PyGtk Example 
+# Version     : 0.1.3
+# Description : Simple RSS Reader
 # ============================================================================
 
 import gtk
@@ -29,7 +29,7 @@ import pango
 import hildon
 import gtkhtml2
 import time
-import webbrowser
+import dbus
 import pickle
 from os.path import isfile, isdir
 from os import mkdir
@@ -37,26 +37,36 @@ import sys
 import urllib2
 import gobject
 from portrait import FremantleRotation
+import threading
+from feedingitdbus import ServerObject
 
 from rss import *
    
 class AddWidgetWizard(hildon.WizardDialog):
     
-    def __init__(self, parent):
+    def __init__(self, parent, urlIn):
         # Create a Notebook
         self.notebook = gtk.Notebook()
 
         self.nameEntry = hildon.Entry(gtk.HILDON_SIZE_AUTO)
         self.nameEntry.set_placeholder("Enter Feed Name")
+        vbox = gtk.VBox(False,10)
+        label = gtk.Label("Enter Feed Name:")
+        vbox.pack_start(label)
+        vbox.pack_start(self.nameEntry)
+        self.notebook.append_page(vbox, None)
         
         self.urlEntry = hildon.Entry(gtk.HILDON_SIZE_AUTO)
-        
         self.urlEntry.set_placeholder("Enter a URL")
-            
+        self.urlEntry.set_text(urlIn)
+        vbox = gtk.VBox(False,10)
+        label = gtk.Label("Enter Feed Name:")
+        vbox.pack_start(label)
+        vbox.pack_start(self.urlEntry)
+        self.notebook.append_page(vbox, None)
+
         labelEnd = gtk.Label("Success")
         
-        self.notebook.append_page(self.nameEntry, None)
-        self.notebook.append_page(self.urlEntry, None) 
         self.notebook.append_page(labelEnd, None)      
 
         hildon.WizardDialog.__init__(self, parent, "Add Feed", self.notebook)
@@ -78,17 +88,73 @@ class AddWidgetWizard(hildon.WizardDialog):
     def some_page_func(self, nb, current, userdata):
         # Validate data for 1st page
         if current == 0:
-            entry = nb.get_nth_page(current)
-            # Check the name is not null
-            return len(entry.get_text()) != 0
+            return len(self.nameEntry.get_text()) != 0
         elif current == 1:
-            entry = nb.get_nth_page(current)
             # Check the url is not null, and starts with http
-            return ( (len(entry.get_text()) != 0) and (entry.get_text().lower().startswith("http")) )
+            return ( (len(self.urlEntry.get_text()) != 0) and (self.urlEntry.get_text().lower().startswith("http")) )
         elif current != 2:
             return False
         else:
             return True
+        
+        
+class Download(threading.Thread):
+    def __init__(self, listing, key):
+        threading.Thread.__init__(self)
+        self.listing = listing
+        self.key = key
+        
+    def run ( self ):
+        self.listing.updateFeed(self.key)
+
+        
+class DownloadDialog():
+    def __init__(self, parent, listing, listOfKeys):
+        self.listOfKeys = listOfKeys
+        self.listing = listing
+        self.total = len(self.listOfKeys)
+        self.current = 0            
+        
+        if self.total>0:
+            self.progress = gtk.ProgressBar()
+            self.waitingWindow = hildon.Note("cancel", parent, "Downloading",
+                                 progressbar=self.progress)
+            self.progress.set_text("Downloading")
+            self.fraction = 0
+            self.progress.set_fraction(self.fraction)
+            # Create a timeout
+            self.timeout_handler_id = gobject.timeout_add(50, self.update_progress_bar)
+            self.waitingWindow.show_all()
+            response = self.waitingWindow.run()
+            self.listOfKeys = []
+            while threading.activeCount() > 1:
+                # Wait for current downloads to finish
+                time.sleep(0.5)
+            self.waitingWindow.destroy()
+        
+    def update_progress_bar(self):
+        #self.progress_bar.pulse()
+        if threading.activeCount() < 4:
+            x = threading.activeCount() - 1
+            k = len(self.listOfKeys)
+            fin = self.total - k - x
+            fraction = float(fin)/float(self.total) + float(x)/(self.total*2.)
+            #print x, k, fin, fraction
+            self.progress.set_fraction(fraction)
+            
+            if len(self.listOfKeys)>0:
+                self.current = self.current+1
+                key = self.listOfKeys.pop()
+                download = Download(self.listing, key)
+                download.start()
+                return True
+            elif threading.activeCount() > 1:
+                return True
+            else:
+                self.waitingWindow.destroy()
+                return False 
+        return True
+        
 
 class DisplayArticle(hildon.StackableWindow):
     def __init__(self, title, text, index):
@@ -126,18 +192,23 @@ class DisplayArticle(hildon.StackableWindow):
         self.document.connect("link_clicked", self._signal_link_clicked)
         self.document.connect("request-url", self._signal_request_url)
         self.connect("destroy", self.destroyWindow)
+        self.timeout_handler_id = gobject.timeout_add(200, self.reloadArticle)
         
     def destroyWindow(self, *args):
         self.emit("article-closed", self.index)
         self.destroy()
         
-    def reloadArticle(self, widget):
+    def reloadArticle(self, *widget):
         self.document.open_stream("text/html")
         self.document.write_stream(self.text)
         self.document.close_stream()
 
     def _signal_link_clicked(self, object, link):
-        webbrowser.open(link)
+        bus = dbus.SystemBus()
+        proxy = bus.get_object("com.nokia.osso_browser", "/com/nokia/osso_browser/request")
+        iface = dbus.Interface(proxy, 'com.nokia.osso_browser')
+        #webbrowser.open(link)
+        iface.open_new_window(link)
 
     def _signal_request_url(self, object, url, stream):
         f = urllib2.urlopen(url)
@@ -146,8 +217,9 @@ class DisplayArticle(hildon.StackableWindow):
 
 
 class DisplayFeed(hildon.StackableWindow):
-    def __init__(self, feed, title, key):
+    def __init__(self, listing, feed, title, key):
         hildon.StackableWindow.__init__(self)
+        self.listing = listing
         self.feed = feed
         self.feedTitle = title
         self.set_title(title)
@@ -213,9 +285,10 @@ class DisplayFeed(hildon.StackableWindow):
         self.buttons[index].show()
 
     def button_update_clicked(self, button):
-        self.listing.getFeed(key).updateFeed()
+        disp = DownloadDialog(self, self.listing, [self.key,] )       
+        #self.feed.updateFeed()
         self.clear()
-        self.displayFeed(key)
+        self.displayFeed()
         
     def buttonReadAllClicked(self, button):
         for index in range(self.feed.getNumberOfEntries()):
@@ -257,8 +330,8 @@ class FeedingIt:
 
         self.displayListing() 
         
-    def button_add_clicked(self, button):
-        wizard = AddWidgetWizard(self.window)
+    def button_add_clicked(self, button, urlIn="http://"):
+        wizard = AddWidgetWizard(self.window, urlIn)
         ret = wizard.run()
         if ret == 2:
             (title, url) = wizard.getData()
@@ -268,14 +341,8 @@ class FeedingIt:
         self.displayListing()
         
     def button_update_clicked(self, button, key):
-        #hildon.hildon_gtk_window_set_progress_indicator(self.window, 1)
-        if key == "All":
-            self.listing.updateFeeds()
-        else:
-            self.listing.getFeed(key).updateFeed()
-            self.displayFeed(key)            
+        disp = DownloadDialog(self.window, self.listing, self.listing.getListOfFeeds() )           
         self.displayListing()
-        #hildon.hildon_gtk_window_set_progress_indicator(self.window, 0)
 
     def button_delete_clicked(self, button):
         self.pickerDialog = hildon.PickerDialog(self.window)
@@ -304,6 +371,7 @@ class FeedingIt:
         self.pickerDialog.destroy()
         if self.show_confirmation_note(self.window, current_selection):
             self.listing.removeFeed(self.mapping[current_selection])
+            
         del self.mapping
         self.displayListing()
 
@@ -333,7 +401,7 @@ class FeedingIt:
             button = hildon.Button(gtk.HILDON_SIZE_AUTO_WIDTH | gtk.HILDON_SIZE_FINGER_HEIGHT,
                               hildon.BUTTON_ARRANGEMENT_VERTICAL)
             button.set_text(self.listing.getFeedTitle(key), self.listing.getFeedUpdateTime(key) + " / " 
-                            + str(self.listing.getFeedNumberOfUnreadItems(key)) + " Unread Items / " + str(self.listing.getFeed(key).getNumberOfEntries()))
+                            + str(self.listing.getFeedNumberOfUnreadItems(key)) + " Unread Items")
             button.set_alignment(0,0,1,1)
             button.connect("clicked", self.buttonFeedClicked, self, self.window, key)
             self.vboxListing.pack_start(button, expand=False)
@@ -342,7 +410,7 @@ class FeedingIt:
         self.window.show_all()
     
     def buttonFeedClicked(widget, button, self, window, key):
-        disp = DisplayFeed(self.listing.getFeed(key), self.listing.getFeedTitle(key), key)
+        disp = DisplayFeed(self.listing, self.listing.getFeed(key), self.listing.getFeedTitle(key), key)
         disp.connect("feed-closed", self.onFeedClosed)
         
     def onFeedClosed(self, object, key):
@@ -358,7 +426,7 @@ class FeedingIt:
 if __name__ == "__main__":
     gobject.signal_new("feed-closed", DisplayFeed, gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,))
     gobject.signal_new("article-closed", DisplayArticle, gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,))
-    
+    gobject.threads_init()
     if not isdir(CONFIGDIR):
         try:
             mkdir(CONFIGDIR)
@@ -366,4 +434,5 @@ if __name__ == "__main__":
             print "Error: Can't create configuration directory"
             sys.exit(1)
     app = FeedingIt()
+    dbusHandler = ServerObject(app)
     app.run()

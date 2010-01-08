@@ -7,9 +7,9 @@ Standards-Version: 3.7.2
 
 Package: feedingit
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, python-gtkhtml2, python, python-hildon
+Depends: ${shlibs:Depends}, ${misc:Depends}, python-gtkhtml2, python, python-hildon, libgtkhtml2-0, python-dbus
 Description: Simple RSS Reader
- Simple RSS Reader, based on feedparser.py
+ Simple RSS Reader, with portrait mode support
 XB-Maemo-Icon-26:
  iVBORw0KGgoAAAANSUhEUgAAABoAAAAaCAYAAACpSkzOAAAAAXNSR0IArs4c
  6QAAAAZiS0dEAP8A/wD/oL2nkwAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAd0

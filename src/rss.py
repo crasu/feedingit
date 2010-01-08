@@ -19,8 +19,8 @@
 # ============================================================================
 # Name        : FeedingIt.py
 # Author      : Yves Marcoz
-# Version     : 0.1
-# Description : PyGtk Example 
+# Version     : 0.1.3
+# Description : Simple RSS Reader
 # ============================================================================
 
 from os.path import isfile
@@ -62,25 +62,29 @@ class Feed:
            self.countUnread = 0
            # Initialize the new articles to unread
            for index in range(self.getNumberOfEntries()):
-               if not self.tmpReadItems.has_key(self.getTitle(index)):
-                   self.readItems[self.getTitle(index)] = False
+               if not self.tmpReadItems.has_key(self.getUniqueId(index)):
+                   self.readItems[self.getUniqueId(index)] = False
                else:
-                   self.readItems[self.getTitle(index)] = self.tmpReadItems[self.getTitle(index)]
-               if self.readItems[self.getTitle(index)]==False:
+                   self.readItems[self.getUniqueId(index)] = self.tmpReadItems[self.getUniqueId(index)]
+               if self.readItems[self.getUniqueId(index)]==False:
                   self.countUnread = self.countUnread + 1
            del tmp
            self.saveFeed()
     
     def setEntryRead(self, index):
-        if self.readItems[self.getTitle(index)]==False:
+        if self.readItems[self.getUniqueId(index)]==False:
             self.countUnread = self.countUnread - 1
-            self.readItems[self.getTitle(index)] = True
+            self.readItems[self.getUniqueId(index)] = True
     
     def isEntryRead(self, index):
-        return self.readItems[self.getTitle(index)]
+        return self.readItems[self.getUniqueId(index)]
     
     def getTitle(self, index):
         return self.entries[index]["title"]
+    
+    def getUniqueId(self,index):
+        entry = self.entries[index]
+        return getId(time.strftime("%a, %d %b %Y %H:%M:%S",entry["updated_parsed"]) + entry["title"])
     
     def getUpdateTime(self):
         return self.updateTime
@@ -103,17 +107,21 @@ class Feed:
         except:
             return []
     
+    def getContent(self, index):
+        entry = self.entries[index]
+        if entry.has_key('content'):
+            content = entry.content[0].value
+        else:
+            content = entry.get('summary', '')
+        return content
+    
     def getArticle(self, index):
         self.setEntryRead(index)
         entry = self.entries[index]
         title = entry.get('title', 'No title')
         #content = entry.get('content', entry.get('summary_detail', {}))
-        if entry.has_key('content'):
-            content = entry.content[0].value
-        else:
-            content = entry.get('summary', '')
-        #print content.keys()
-        #.get('value', "No Data")
+        content = self.getContent(index)
+
         link = entry.get('link', 'NoLink')
         date = time.strftime("%a, %d %b %Y %H:%M:%S",entry["updated_parsed"])
         #text = '''<div style="color: black; background-color: white;">'''
@@ -148,6 +156,9 @@ class Listing:
         for key in self.listOfFeeds.keys():
             self.feeds[key].updateFeed()
             
+    def updateFeed(self, key):
+        self.feeds[key].updateFeed()
+            
     def getFeed(self, key):
         return self.feeds[key]
     
@@ -176,6 +187,7 @@ class Listing:
         del self.feeds[key]
         if isfile(CONFIGDIR+key):
            remove(CONFIGDIR+key)
+        self.saveConfig()
     
     def saveConfig(self):
         file = open(CONFIGDIR+"feeds.pickle", "w")
