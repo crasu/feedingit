@@ -19,7 +19,7 @@
 # ============================================================================
 # Name        : FeedingIt.py
 # Author      : Yves Marcoz
-# Version     : 0.1.3
+# Version     : 0.2.0
 # Description : Simple RSS Reader
 # ============================================================================
 
@@ -154,7 +154,132 @@ class DownloadDialog():
                 self.waitingWindow.destroy()
                 return False 
         return True
+    
+    
+class SortList(gtk.Dialog):
+    def __init__(self, parent, listing):
+        gtk.Dialog.__init__(self, "Organizer",  parent)
+        self.listing = listing
         
+        self.vbox2 = gtk.VBox(False, 10)
+        
+        button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
+        button.set_label("Move Up")
+        button.connect("clicked", self.buttonUp)
+        self.vbox2.pack_start(button, expand=False, fill=False)
+        
+        button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
+        button.set_label("Move Down")
+        button.connect("clicked", self.buttonDown)
+        self.vbox2.pack_start(button, expand=False, fill=False)
+        
+        button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
+        button.set_label("Delete")
+        button.connect("clicked", self.buttonDelete)
+        self.vbox2.pack_start(button, expand=False, fill=False)
+        
+        #button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
+        #button.set_label("Done")
+        #button.connect("clicked", self.buttonDone)
+        #self.vbox.pack_start(button)
+        self.hbox2= gtk.HBox(False, 10)
+        self.pannableArea = hildon.PannableArea()
+        self.treestore = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
+        self.treeview = gtk.TreeView(self.treestore)
+        self.hbox2.pack_start(self.pannableArea, expand=True)
+        self.displayFeeds()
+        self.hbox2.pack_end(self.vbox2, expand=False)
+        self.set_default_size(-1, 600)
+        self.vbox.pack_start(self.hbox2)
+        
+        self.show_all()
+        #self.connect("destroy", self.buttonDone)
+        
+    def displayFeeds(self):
+        self.treeview.destroy()
+        self.treestore = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
+        self.treeview = gtk.TreeView()
+        
+        self.treeview.get_selection().set_mode(gtk.SELECTION_SINGLE)
+        hildon.hildon_gtk_tree_view_set_ui_mode(self.treeview, gtk.HILDON_UI_MODE_EDIT)
+        self.refreshList()
+        self.treeview.append_column(gtk.TreeViewColumn('Feed Name', gtk.CellRendererText(), text = 0))
+
+        self.pannableArea.add(self.treeview)
+
+        #self.show_all()
+
+    def refreshList(self, selected=None, offset=0):
+        #x = self.treeview.get_visible_rect().x
+        rect = self.treeview.get_visible_rect()
+        y = rect.y+rect.height
+        #self.pannableArea.jump_to(-1, 0)
+        self.treestore = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
+        for key in self.listing.getListOfFeeds():
+            item = self.treestore.append([self.listing.getFeedTitle(key), key])
+            if key == selected:
+                selectedItem = item
+        self.treeview.set_model(self.treestore)
+        if not selected == None:
+            self.treeview.get_selection().select_iter(selectedItem)
+            self.treeview.scroll_to_cell(self.treeview.get_model().get_path(selectedItem))
+            #self.pannableArea.jump_to(-1, y+offset)
+        self.pannableArea.show_all()
+
+    def getSelectedItem(self):
+        (model, iter) = self.treeview.get_selection().get_selected()
+        if not iter:
+            return None
+        return model.get_value(iter, 1)
+
+    def findIndex(self, key):
+        after = None
+        before = None
+        found = False
+        for row in self.treestore:
+            if found:
+                return (before, row.iter)
+            if key == list(row)[0]:
+                found = True
+            else:
+                before = row.iter
+        return (before, None)
+
+    def buttonUp(self, button):
+        key  = self.getSelectedItem()
+        if not key == None:
+            self.listing.moveUp(key)
+            self.refreshList(key, -10)
+        #placement = self.pannableArea.get_placement()
+        #placement = self.treeview.get_visible_rect().y
+        #self.displayFeeds(key)
+        
+        #self.treeview.scroll_to_point(-1, y)
+        #self.pannableArea.set_placement(placement)
+
+    def buttonDown(self, button):
+        key = self.getSelectedItem()
+        if not key == None:
+            self.listing.moveDown(key)
+            #(before, after) = self.findIndex(key)
+            #self.treestore.move_after(iter, after)
+            #self.treeview.set_model(self.treestore)
+            #self.treeview.show_all()
+            self.refreshList(key, 10)
+            
+        #placement = self.pannableArea.get_placement()
+        #self.displayFeeds(key)
+        #self.pannableArea.set_placement(placement)
+
+    def buttonDelete(self, button):
+        key = self.getSelectedItem()
+        if not key == None:
+            self.listing.removeFeed(key)
+        self.refreshList()
+
+    def buttonDone(self, *args):
+        self.destroy()
+               
 
 class DisplayArticle(hildon.StackableWindow):
     def __init__(self, title, text, index):
@@ -168,6 +293,7 @@ class DisplayArticle(hildon.StackableWindow):
         self.pannable_article = hildon.PannableArea()
         self.pannable_article.add(self.view)
         self.pannable_article.set_property("mov-mode", hildon.MOVEMENT_MODE_BOTH)
+        self.pannable_article.connect('horizontal-movement', self.gesture)
         self.document = gtkhtml2.Document()
         self.view.set_document(self.document)
         
@@ -181,6 +307,7 @@ class DisplayArticle(hildon.StackableWindow):
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
         button.set_label("Display Images")
         button.connect("clicked", self.reloadArticle)
+        
         menu.append(button)
         self.set_app_menu(menu)
         menu.show_all()
@@ -191,8 +318,17 @@ class DisplayArticle(hildon.StackableWindow):
         
         self.document.connect("link_clicked", self._signal_link_clicked)
         self.document.connect("request-url", self._signal_request_url)
-        self.connect("destroy", self.destroyWindow)
+        self.destroyId = self.connect("destroy", self.destroyWindow)
         self.timeout_handler_id = gobject.timeout_add(200, self.reloadArticle)
+        
+    def gesture(self, widget, direction, startx, starty):
+        #self.disconnect(self.destroyId)
+        if (direction == 3):
+            self.emit("article-next", self.index)
+        if (direction == 2):
+            self.emit("article-previous", self.index)
+        #self.emit("article-closed", self.index)
+        self.timeout_handler_id = gobject.timeout_add(200, self.destroyWindow)
         
     def destroyWindow(self, *args):
         self.emit("article-closed", self.index)
@@ -242,9 +378,9 @@ class DisplayFeed(hildon.StackableWindow):
         self.connect("destroy", self.destroyWindow)
         
     def destroyWindow(self, *args):
-        self.feed.saveFeed()
         self.emit("feed-closed", self.key)
         self.destroy()
+        self.feed.saveFeed()
 
     def displayFeed(self):
         self.vboxFeed = gtk.VBox(False, 10)
@@ -276,9 +412,24 @@ class DisplayFeed(hildon.StackableWindow):
         self.remove(self.pannableFeed)
         
     def button_clicked(self, button, index):
-        disp = DisplayArticle(self.feedTitle, self.feed.getArticle(index), index)
-        disp.connect("article-closed", self.onArticleClosed)
-        
+        self.disp = DisplayArticle(self.feedTitle, self.feed.getArticle(index), index)
+        self.ids = []
+        self.ids.append(self.disp.connect("article-closed", self.onArticleClosed))
+        self.ids.append(self.disp.connect("article-next", self.nextArticle))
+        self.ids.append(self.disp.connect("article-previous", self.previousArticle))
+
+    def nextArticle(self, object, index):
+        label = self.buttons[index].child
+        label.modify_font(pango.FontDescription("sans 16"))
+        index = (index+1) % len(self.listing.getListOfFeeds())
+        self.button_clicked(object, index)
+
+    def previousArticle(self, object, index):
+        label = self.buttons[index].child
+        label.modify_font(pango.FontDescription("sans 16"))
+        index = (index-1) % len(self.listing.getListOfFeeds())
+        self.button_clicked(object, index)
+
     def onArticleClosed(self, object, index):
         label = self.buttons[index].child
         label.modify_font(pango.FontDescription("sans 16"))
@@ -322,6 +473,11 @@ class FeedingIt:
         button.connect("clicked", self.button_delete_clicked)
         menu.append(button)
         
+        button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
+        button.set_label("Organize Feeds")
+        button.connect("clicked", self.button_organize_clicked)
+        menu.append(button)
+        
         self.window.set_app_menu(menu)
         menu.show_all()
         
@@ -329,6 +485,13 @@ class FeedingIt:
         self.articleWindow = hildon.StackableWindow()
 
         self.displayListing() 
+        
+    def button_organize_clicked(self, button):
+        org = SortList(self.window, self.listing)
+        org.run()
+        org.destroy()
+        self.listing.saveConfig()
+        self.displayListing()
         
     def button_add_clicked(self, button, urlIn="http://"):
         wizard = AddWidgetWizard(self.window, urlIn)
@@ -371,6 +534,7 @@ class FeedingIt:
         self.pickerDialog.destroy()
         if self.show_confirmation_note(self.window, current_selection):
             self.listing.removeFeed(self.mapping[current_selection])
+            self.listing.saveConfig()
             
         del self.mapping
         self.displayListing()
@@ -426,6 +590,8 @@ class FeedingIt:
 if __name__ == "__main__":
     gobject.signal_new("feed-closed", DisplayFeed, gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,))
     gobject.signal_new("article-closed", DisplayArticle, gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,))
+    gobject.signal_new("article-next", DisplayArticle, gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,))
+    gobject.signal_new("article-previous", DisplayArticle, gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,))
     gobject.threads_init()
     if not isdir(CONFIGDIR):
         try:

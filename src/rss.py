@@ -19,7 +19,7 @@
 # ============================================================================
 # Name        : FeedingIt.py
 # Author      : Yves Marcoz
-# Version     : 0.1.3
+# Version     : 0.2.0
 # Description : Simple RSS Reader
 # ============================================================================
 
@@ -143,7 +143,12 @@ class Listing:
             file.close()
         else:
             self.listOfFeeds = {getId("Slashdot"):{"title":"Slashdot", "url":"http://rss.slashdot.org/Slashdot/slashdot"}, }
-        for key in self.listOfFeeds.keys():
+        if self.listOfFeeds.has_key("feedingit-order"):
+            self.sortedKeys = self.listOfFeeds["feedingit-order"]
+        else:
+            self.sortedKeys = self.listOfFeeds.keys()
+            self.sortedKeys.sort(key=lambda obj: self.getFeedTitle(obj))
+        for key in self.sortedKeys:
             if isfile(CONFIGDIR+key):
                 file = open(CONFIGDIR+key)
                 self.feeds[key] = pickle.load(file)
@@ -153,7 +158,7 @@ class Listing:
         self.saveConfig()
         
     def updateFeeds(self):
-        for key in self.listOfFeeds.keys():
+        for key in self.getListOfFeeds():
             self.feeds[key].updateFeed()
             
     def updateFeed(self, key):
@@ -175,21 +180,34 @@ class Listing:
         return self.listOfFeeds[key]["url"]
     
     def getListOfFeeds(self):
-        return self.listOfFeeds.keys()
+        return self.sortedKeys
     
     def addFeed(self, title, url):
         self.listOfFeeds[getId(title)] = {"title":title, "url":url}
+        self.sortedKeys.append(getId(title))
         self.saveConfig()
         self.feeds[getId(title)] = Feed(title, url)
         
     def removeFeed(self, key):
         del self.listOfFeeds[key]
+        self.sortedKeys.remove(key)
         del self.feeds[key]
         if isfile(CONFIGDIR+key):
            remove(CONFIGDIR+key)
-        self.saveConfig()
     
     def saveConfig(self):
+        self.listOfFeeds["feedingit-order"] = self.sortedKeys
         file = open(CONFIGDIR+"feeds.pickle", "w")
         pickle.dump(self.listOfFeeds, file)
         file.close()
+        
+    def moveUp(self, key):
+        index = self.sortedKeys.index(key)
+        self.sortedKeys[index] = self.sortedKeys[index-1]
+        self.sortedKeys[index-1] = key
+        
+    def moveDown(self, key):
+        index = self.sortedKeys.index(key)
+        index2 = (index+1)%len(self.sortedKeys)
+        self.sortedKeys[index] = self.sortedKeys[index2]
+        self.sortedKeys[index2] = key
