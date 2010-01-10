@@ -143,6 +143,7 @@ class Listing:
             file.close()
         else:
             self.listOfFeeds = {getId("Slashdot"):{"title":"Slashdot", "url":"http://rss.slashdot.org/Slashdot/slashdot"}, }
+        print self.listOfFeeds.has_key("feedingit-order")
         if self.listOfFeeds.has_key("feedingit-order"):
             self.sortedKeys = self.listOfFeeds["feedingit-order"]
         else:
@@ -158,8 +159,11 @@ class Listing:
         self.saveConfig()
         
     def updateFeeds(self):
+        print self.sortedKeys
         for key in self.getListOfFeeds():
+            print key, self.sortedKeys
             self.feeds[key].updateFeed()
+        print self.sortedKeys
             
     def updateFeed(self, key):
         self.feeds[key].updateFeed()

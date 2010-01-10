@@ -1,9 +1,15 @@
-feedingit (0.2.0-1) unstable; urgency=low
+feedingit (0.2.0-3) unstable; urgency=low
+
+  * Removed horizontal scrolling of articles
+  
+ -- Yves <yves@marcoz.org>  Sun, 10 Jan 2010 10:01:19 -0800
+
+feedingit (0.2.0-2) unstable; urgency=low
 
   * Added support for left/right gestures in articles
   * Added support for sorting the feed list
   
- -- Yves <yves@marcoz.org>  Thu, 09 Jan 2010 22:03:19 -0800
+ -- Yves <yves@marcoz.org>  Sat, 09 Jan 2010 22:03:19 -0800
 
 feedingit (0.1.3-1) unstable; urgency=low
 

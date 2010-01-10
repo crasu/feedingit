@@ -110,7 +110,7 @@ class Download(threading.Thread):
         
 class DownloadDialog():
     def __init__(self, parent, listing, listOfKeys):
-        self.listOfKeys = listOfKeys
+        self.listOfKeys = listOfKeys[:]
         self.listing = listing
         self.total = len(self.listOfKeys)
         self.current = 0            
@@ -292,7 +292,7 @@ class DisplayArticle(hildon.StackableWindow):
         self.view = gtkhtml2.View()
         self.pannable_article = hildon.PannableArea()
         self.pannable_article.add(self.view)
-        self.pannable_article.set_property("mov-mode", hildon.MOVEMENT_MODE_BOTH)
+        #self.pannable_article.set_property("mov-mode", hildon.MOVEMENT_MODE_BOTH)
         self.pannable_article.connect('horizontal-movement', self.gesture)
         self.document = gtkhtml2.Document()
         self.view.set_document(self.document)
@@ -319,7 +319,7 @@ class DisplayArticle(hildon.StackableWindow):
         self.document.connect("link_clicked", self._signal_link_clicked)
         self.document.connect("request-url", self._signal_request_url)
         self.destroyId = self.connect("destroy", self.destroyWindow)
-        self.timeout_handler_id = gobject.timeout_add(200, self.reloadArticle)
+        self.timeout_handler_id = gobject.timeout_add(300, self.reloadArticle)
         
     def gesture(self, widget, direction, startx, starty):
         #self.disconnect(self.destroyId)
@@ -421,13 +421,13 @@ class DisplayFeed(hildon.StackableWindow):
     def nextArticle(self, object, index):
         label = self.buttons[index].child
         label.modify_font(pango.FontDescription("sans 16"))
-        index = (index+1) % len(self.listing.getListOfFeeds())
+        index = (index+1) % self.feed.getNumberOfEntries()
         self.button_clicked(object, index)
 
     def previousArticle(self, object, index):
         label = self.buttons[index].child
         label.modify_font(pango.FontDescription("sans 16"))
-        index = (index-1) % len(self.listing.getListOfFeeds())
+        index = (index-1) % self.feed.getNumberOfEntries()
         self.button_clicked(object, index)
 
     def onArticleClosed(self, object, index):
@@ -572,11 +572,11 @@ class FeedingIt:
             self.buttons[key] = button
         self.window.add(self.pannableListing)
         self.window.show_all()
-    
+
     def buttonFeedClicked(widget, button, self, window, key):
         disp = DisplayFeed(self.listing, self.listing.getFeed(key), self.listing.getFeedTitle(key), key)
         disp.connect("feed-closed", self.onFeedClosed)
-        
+
     def onFeedClosed(self, object, key):
         self.buttons[key].set_text(self.listing.getFeedTitle(key), self.listing.getFeedUpdateTime(key) + " / " 
                             + str(self.listing.getFeedNumberOfUnreadItems(key)) + " Unread Items")
