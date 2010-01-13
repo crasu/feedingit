@@ -38,6 +38,7 @@ import urllib2
 import gobject
 from portrait import FremantleRotation
 import threading
+import thread
 from feedingitdbus import ServerObject
 
 from rss import *
@@ -59,8 +60,10 @@ class AddWidgetWizard(hildon.WizardDialog):
         self.urlEntry = hildon.Entry(gtk.HILDON_SIZE_AUTO)
         self.urlEntry.set_placeholder("Enter a URL")
         self.urlEntry.set_text(urlIn)
+        self.urlEntry.select_region(0,-1)
+        
         vbox = gtk.VBox(False,10)
-        label = gtk.Label("Enter Feed Name:")
+        label = gtk.Label("Enter Feed URL:")
         vbox.pack_start(label)
         vbox.pack_start(self.urlEntry)
         self.notebook.append_page(vbox, None)
@@ -96,7 +99,17 @@ class AddWidgetWizard(hildon.WizardDialog):
             return False
         else:
             return True
-        
+
+class GetImage(threading.Thread):
+    def __init__(self, url):
+        threading.Thread.__init__(self)
+        self.url = url
+    
+    def run(self):
+        f = urllib2.urlopen(self.url)
+        self.data = f.read()
+        f.close()
+
         
 class Download(threading.Thread):
     def __init__(self, listing, key):
@@ -104,7 +117,7 @@ class Download(threading.Thread):
         self.listing = listing
         self.key = key
         
-    def run ( self ):
+    def run (self):
         self.listing.updateFeed(self.key)
 
         
@@ -287,7 +300,8 @@ class DisplayArticle(hildon.StackableWindow):
         self.index = index
         self.text = text
         self.set_title(title)
-
+        self.images = []
+        
         # Init the article display    
         self.view = gtkhtml2.View()
         self.pannable_article = hildon.PannableArea()
@@ -296,7 +310,8 @@ class DisplayArticle(hildon.StackableWindow):
         self.pannable_article.connect('horizontal-movement', self.gesture)
         self.document = gtkhtml2.Document()
         self.view.set_document(self.document)
-        
+        self.document.connect("link_clicked", self._signal_link_clicked)
+        self.document.connect("request-url", self._signal_request_url)
         self.document.clear()
         self.document.open_stream("text/html")
         self.document.write_stream(self.text)
@@ -316,40 +331,42 @@ class DisplayArticle(hildon.StackableWindow):
         
         self.show_all()
         
-        self.document.connect("link_clicked", self._signal_link_clicked)
-        self.document.connect("request-url", self._signal_request_url)
         self.destroyId = self.connect("destroy", self.destroyWindow)
         self.timeout_handler_id = gobject.timeout_add(300, self.reloadArticle)
         
     def gesture(self, widget, direction, startx, starty):
-        #self.disconnect(self.destroyId)
         if (direction == 3):
             self.emit("article-next", self.index)
         if (direction == 2):
             self.emit("article-previous", self.index)
-        #self.emit("article-closed", self.index)
         self.timeout_handler_id = gobject.timeout_add(200, self.destroyWindow)
-        
+
     def destroyWindow(self, *args):
         self.emit("article-closed", self.index)
         self.destroy()
         
     def reloadArticle(self, *widget):
-        self.document.open_stream("text/html")
-        self.document.write_stream(self.text)
-        self.document.close_stream()
+        if threading.activeCount() > 1:
+            # Image thread are still running, come back in a bit
+            return True
+        else:
+            for (stream, imageThread) in self.images:
+                imageThread.join()
+                stream.write(imageThread.data)
+                stream.close()
+            return False
+        self.show_all()
 
     def _signal_link_clicked(self, object, link):
         bus = dbus.SystemBus()
         proxy = bus.get_object("com.nokia.osso_browser", "/com/nokia/osso_browser/request")
         iface = dbus.Interface(proxy, 'com.nokia.osso_browser')
-        #webbrowser.open(link)
         iface.open_new_window(link)
 
     def _signal_request_url(self, object, url, stream):
-        f = urllib2.urlopen(url)
-        stream.write(f.read())
-        stream.close()
+        imageThread = GetImage(url)
+        imageThread.start()
+        self.images.append((stream, imageThread))
 
 
 class DisplayFeed(hildon.StackableWindow):
@@ -535,7 +552,6 @@ class FeedingIt:
         if self.show_confirmation_note(self.window, current_selection):
             self.listing.removeFeed(self.mapping[current_selection])
             self.listing.saveConfig()
-            
         del self.mapping
         self.displayListing()
 
@@ -585,6 +601,7 @@ class FeedingIt:
     def run(self):
         self.window.connect("destroy", gtk.main_quit)
         gtk.main()
+        self.listing.saveConfig()
 
 
 if __name__ == "__main__":

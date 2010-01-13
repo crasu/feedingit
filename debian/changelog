@@ -1,3 +1,16 @@
+feedingit (0.2.1-2) unstable; urgency=low
+
+  * Fixed issue with feeds without dates (#5019)
+  * Improved threading of image download
+  
+ -- Yves <yves@marcoz.org>  Tue, 12 Jan 2010 18:43:19 -0800
+
+feedingit (0.2.0-4) unstable; urgency=low
+
+  * Fixed AddFeed dialog typo
+  
+ -- Yves <yves@marcoz.org>  Sun, 10 Jan 2010 12:06:19 -0800
+
 feedingit (0.2.0-3) unstable; urgency=low
 
   * Removed horizontal scrolling of articles

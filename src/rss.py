@@ -84,7 +84,12 @@ class Feed:
     
     def getUniqueId(self,index):
         entry = self.entries[index]
-        return getId(time.strftime("%a, %d %b %Y %H:%M:%S",entry["updated_parsed"]) + entry["title"])
+        if entry.has_key("updated_parsed"):
+            return getId(time.strftime("%a, %d %b %Y %H:%M:%S",entry["updated_parsed"]) + entry["title"])
+        elif entry.has_key("link"):
+            return getId(entry["link"] + entry["title"])
+        else:
+            return getId(entry["title"])
     
     def getUpdateTime(self):
         return self.updateTime
@@ -123,7 +128,12 @@ class Feed:
         content = self.getContent(index)
 
         link = entry.get('link', 'NoLink')
-        date = time.strftime("%a, %d %b %Y %H:%M:%S",entry["updated_parsed"])
+        if entry.has_key("updated_parsed"):
+            date = time.strftime("%a, %d %b %Y %H:%M:%S",entry["updated_parsed"])
+        elif entry.has_key("published_parsed"):
+            date = time.strftime("%a, %d %b %Y %H:%M:%S", entry["published_parsed"])
+        else:
+            date = ""
         #text = '''<div style="color: black; background-color: white;">'''
         text = '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>'
         text = text + '<div><a href=\"' + link + '\">' + title + "</a>"
@@ -143,27 +153,26 @@ class Listing:
             file.close()
         else:
             self.listOfFeeds = {getId("Slashdot"):{"title":"Slashdot", "url":"http://rss.slashdot.org/Slashdot/slashdot"}, }
-        print self.listOfFeeds.has_key("feedingit-order")
         if self.listOfFeeds.has_key("feedingit-order"):
             self.sortedKeys = self.listOfFeeds["feedingit-order"]
         else:
             self.sortedKeys = self.listOfFeeds.keys()
             self.sortedKeys.sort(key=lambda obj: self.getFeedTitle(obj))
         for key in self.sortedKeys:
+            self.loadFeed(key)
+        #self.saveConfig()
+        
+    def loadFeed(self, key):
             if isfile(CONFIGDIR+key):
                 file = open(CONFIGDIR+key)
                 self.feeds[key] = pickle.load(file)
                 file.close()
             else:
                 self.feeds[key] = Feed(self.listOfFeeds[key]["title"], self.listOfFeeds[key]["url"])
-        self.saveConfig()
         
     def updateFeeds(self):
-        print self.sortedKeys
         for key in self.getListOfFeeds():
-            print key, self.sortedKeys
             self.feeds[key].updateFeed()
-        print self.sortedKeys
             
     def updateFeed(self, key):
         self.feeds[key].updateFeed()

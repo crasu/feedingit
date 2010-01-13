@@ -1,15 +1,17 @@
 Source: feedingit
 Section: user/network
-Priority: extra
+Priority: optional
 Maintainer: Yves <yves@marcoz.org>
 Build-Depends: debhelper (>= 5)
 Standards-Version: 3.7.2
+XB-Maemo-Display-Name: FeedingIt                                                                                                                      
+XSBC-Bugtracker: https://garage.maemo.org/tracker/?func=browse&group_id=1202&atid=4512
 
 Package: feedingit
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, python-gtkhtml2, python, python-hildon, libgtkhtml2-0, python-dbus
 Description: Simple RSS Reader
- Simple RSS Reader, with portrait mode support
+ Simple RSS Reader, with portrait mode support, and swipe gestures in articles
 XB-Maemo-Icon-26:
  iVBORw0KGgoAAAANSUhEUgAAABoAAAAaCAYAAACpSkzOAAAAAXNSR0IArs4c
  6QAAAAZiS0dEAP8A/wD/oL2nkwAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAd0
