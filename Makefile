@@ -12,6 +12,7 @@ install:
 	install src/feedparser.py ${DESTDIR}/opt/FeedingIt
 	install src/portrait.py ${DESTDIR}/opt/FeedingIt
 	install src/rss.py ${DESTDIR}/opt/FeedingIt
+	install src/opml.py ${DESTDIR}/opt/FeedingIt
 	install src/feedingitdbus.py ${DESTDIR}/opt/FeedingIt
 	install -d ${DESTDIR}/usr/share/applications/hildon
 	install src/FeedingIt.desktop ${DESTDIR}/usr/share/applications/hildon

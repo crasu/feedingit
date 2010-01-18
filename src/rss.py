@@ -40,11 +40,19 @@ class Feed:
     # Contains all the info about a single feed (articles, ...), and expose the data
     def __init__(self, name, url):
         self.entries = []
+        self.fontSize = "+0"
         self.readItems = {}
         self.countUnread = 0
         self.name = name
         self.url = url
         self.updateTime = "Never"
+
+    def getFontSize(self):
+        try:
+            return self.fontSize
+        except:
+            self.fontSize = "+0"
+            return self.fontSize
 
     def saveFeed(self):
         file = open(CONFIGDIR+getId(self.name), "w")
@@ -136,10 +144,10 @@ class Feed:
             date = ""
         #text = '''<div style="color: black; background-color: white;">'''
         text = '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>'
-        text = text + '<div><a href=\"' + link + '\">' + title + "</a>"
-        text = text + "<BR /><small><i>Date: " + date + "</i></small></div>"
-        text = text + "<BR /><BR />"
-        text = text + content
+        text += '<div><a href=\"' + link + '\">' + title + "</a>"
+        text += "<BR /><small><i>Date: " + date + "</i></small></div>"
+        text += "<BR /><BR />"
+        text += content
         return text    
 
 
@@ -153,14 +161,33 @@ class Listing:
             file.close()
         else:
             self.listOfFeeds = {getId("Slashdot"):{"title":"Slashdot", "url":"http://rss.slashdot.org/Slashdot/slashdot"}, }
+        if not self.listOfFeeds.has_key("font"):
+            self.setFont("16")
         if self.listOfFeeds.has_key("feedingit-order"):
             self.sortedKeys = self.listOfFeeds["feedingit-order"]
         else:
             self.sortedKeys = self.listOfFeeds.keys()
+            if "font" in self.sortedKeys:
+                self.sortedKeys.remove("font")
             self.sortedKeys.sort(key=lambda obj: self.getFeedTitle(obj))
         for key in self.sortedKeys:
-            self.loadFeed(key)
+            try:
+                self.loadFeed(key)
+            except:
+                self.sortedKeys.remove(key)
         #self.saveConfig()
+        
+    def getFontSize(self):
+        return self.listOfFeeds["font"]
+    
+    def getReadFont(self):
+        return "sans %s" % self.listOfFeeds["font"]
+    
+    def getUnreadFont(self):
+        return "sans bold %s" % self.listOfFeeds["font"]
+    
+    def setFont(self, fontname):
+        self.listOfFeeds["font"] = fontname
         
     def loadFeed(self, key):
             if isfile(CONFIGDIR+key):
@@ -168,7 +195,9 @@ class Listing:
                 self.feeds[key] = pickle.load(file)
                 file.close()
             else:
-                self.feeds[key] = Feed(self.listOfFeeds[key]["title"], self.listOfFeeds[key]["url"])
+                title = self.listOfFeeds[key]["title"]
+                url = self.listOfFeeds[key]["url"]
+                self.feeds[key] = Feed(title, url)
         
     def updateFeeds(self):
         for key in self.getListOfFeeds():
@@ -196,10 +225,11 @@ class Listing:
         return self.sortedKeys
     
     def addFeed(self, title, url):
-        self.listOfFeeds[getId(title)] = {"title":title, "url":url}
-        self.sortedKeys.append(getId(title))
-        self.saveConfig()
-        self.feeds[getId(title)] = Feed(title, url)
+        if not self.listOfFeeds.has_key(getId(title)):
+            self.listOfFeeds[getId(title)] = {"title":title, "url":url}
+            self.sortedKeys.append(getId(title))
+            self.saveConfig()
+            self.feeds[getId(title)] = Feed(title, url)
         
     def removeFeed(self, key):
         del self.listOfFeeds[key]

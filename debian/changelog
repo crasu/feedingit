@@ -1,3 +1,22 @@
+feedingit (0.2.3-2) unstable; urgency=low
+
+  * Fixed missing python-osso dependency
+  
+ -- Yves <yves@marcoz.org>  Sat, 17 Jan 2010 13:31:19 -0800
+
+feedingit (0.2.3-1) unstable; urgency=low
+
+  * Added Font size option for feeds
+  * Added option to enable horizontal scrolling of articles (disabling gestures)
+  
+ -- Yves <yves@marcoz.org>  Sat, 17 Jan 2010 13:31:19 -0800
+
+feedingit (0.2.2-1) unstable; urgency=low
+
+  * Added support for Import/Export of OPML files
+  
+ -- Yves <yves@marcoz.org>  Sat, 16 Jan 2010 14:38:19 -0800
+
 feedingit (0.2.1-2) unstable; urgency=low
 
   * Fixed issue with feeds without dates (#5019)

@@ -42,6 +42,7 @@ import thread
 from feedingitdbus import ServerObject
 
 from rss import *
+from opml import GetOpmlData, ExportOpmlData
    
 class AddWidgetWizard(hildon.WizardDialog):
     
@@ -154,7 +155,7 @@ class DownloadDialog():
             fraction = float(fin)/float(self.total) + float(x)/(self.total*2.)
             #print x, k, fin, fraction
             self.progress.set_fraction(fraction)
-            
+
             if len(self.listOfKeys)>0:
                 self.current = self.current+1
                 key = self.listOfKeys.pop()
@@ -223,10 +224,8 @@ class SortList(gtk.Dialog):
         #self.show_all()
 
     def refreshList(self, selected=None, offset=0):
-        #x = self.treeview.get_visible_rect().x
         rect = self.treeview.get_visible_rect()
         y = rect.y+rect.height
-        #self.pannableArea.jump_to(-1, 0)
         self.treestore = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
         for key in self.listing.getListOfFeeds():
             item = self.treestore.append([self.listing.getFeedTitle(key), key])
@@ -236,7 +235,6 @@ class SortList(gtk.Dialog):
         if not selected == None:
             self.treeview.get_selection().select_iter(selectedItem)
             self.treeview.scroll_to_cell(self.treeview.get_model().get_path(selectedItem))
-            #self.pannableArea.jump_to(-1, y+offset)
         self.pannableArea.show_all()
 
     def getSelectedItem(self):
@@ -263,26 +261,12 @@ class SortList(gtk.Dialog):
         if not key == None:
             self.listing.moveUp(key)
             self.refreshList(key, -10)
-        #placement = self.pannableArea.get_placement()
-        #placement = self.treeview.get_visible_rect().y
-        #self.displayFeeds(key)
-        
-        #self.treeview.scroll_to_point(-1, y)
-        #self.pannableArea.set_placement(placement)
 
     def buttonDown(self, button):
         key = self.getSelectedItem()
         if not key == None:
             self.listing.moveDown(key)
-            #(before, after) = self.findIndex(key)
-            #self.treestore.move_after(iter, after)
-            #self.treeview.set_model(self.treestore)
-            #self.treeview.show_all()
             self.refreshList(key, 10)
-            
-        #placement = self.pannableArea.get_placement()
-        #self.displayFeeds(key)
-        #self.pannableArea.set_placement(placement)
 
     def buttonDelete(self, button):
         key = self.getSelectedItem()
@@ -307,7 +291,7 @@ class DisplayArticle(hildon.StackableWindow):
         self.pannable_article = hildon.PannableArea()
         self.pannable_article.add(self.view)
         #self.pannable_article.set_property("mov-mode", hildon.MOVEMENT_MODE_BOTH)
-        self.pannable_article.connect('horizontal-movement', self.gesture)
+        self.gestureId = self.pannable_article.connect('horizontal-movement', self.gesture)
         self.document = gtkhtml2.Document()
         self.view.set_document(self.document)
         self.document.connect("link_clicked", self._signal_link_clicked)
@@ -320,8 +304,8 @@ class DisplayArticle(hildon.StackableWindow):
         menu = hildon.AppMenu()
         # Create a button and add it to the menu
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
-        button.set_label("Display Images")
-        button.connect("clicked", self.reloadArticle)
+        button.set_label("Allow Horizontal Scrolling")
+        button.connect("clicked", self.horiz_scrolling_button)
         
         menu.append(button)
         self.set_app_menu(menu)
@@ -330,10 +314,10 @@ class DisplayArticle(hildon.StackableWindow):
         self.add(self.pannable_article)
         
         self.show_all()
-        
+
         self.destroyId = self.connect("destroy", self.destroyWindow)
         self.timeout_handler_id = gobject.timeout_add(300, self.reloadArticle)
-        
+
     def gesture(self, widget, direction, startx, starty):
         if (direction == 3):
             self.emit("article-next", self.index)
@@ -344,6 +328,10 @@ class DisplayArticle(hildon.StackableWindow):
     def destroyWindow(self, *args):
         self.emit("article-closed", self.index)
         self.destroy()
+        
+    def horiz_scrolling_button(self, *widget):
+        self.pannable_article.disconnect(self.gestureId)
+        self.pannable_article.set_property("mov-mode", hildon.MOVEMENT_MODE_BOTH)
         
     def reloadArticle(self, *widget):
         if threading.activeCount() > 1:
@@ -410,9 +398,13 @@ class DisplayFeed(hildon.StackableWindow):
             button.set_alignment(0,0)
             label = button.child
             if self.feed.isEntryRead(index):
-                label.modify_font(pango.FontDescription("sans 16"))
+                #label.modify_font(pango.FontDescription("sans 16"))
+                label.modify_font(pango.FontDescription(self.listing.getReadFont()))
             else:
-                label.modify_font(pango.FontDescription("sans bold 16"))
+                #print self.listing.getFont() + " bold"
+                label.modify_font(pango.FontDescription(self.listing.getUnreadFont()))
+                #label.modify_font(pango.FontDescription("sans bold 23"))
+                #"sans bold 16"
             label.set_line_wrap(True)
             
             label.set_size_request(self.get_size()[0]-50, -1)
@@ -437,19 +429,19 @@ class DisplayFeed(hildon.StackableWindow):
 
     def nextArticle(self, object, index):
         label = self.buttons[index].child
-        label.modify_font(pango.FontDescription("sans 16"))
+        label.modify_font(pango.FontDescription(self.listing.getReadFont()))
         index = (index+1) % self.feed.getNumberOfEntries()
         self.button_clicked(object, index)
 
     def previousArticle(self, object, index):
         label = self.buttons[index].child
-        label.modify_font(pango.FontDescription("sans 16"))
+        label.modify_font(pango.FontDescription(self.listing.getReadFont()))
         index = (index-1) % self.feed.getNumberOfEntries()
         self.button_clicked(object, index)
 
     def onArticleClosed(self, object, index):
         label = self.buttons[index].child
-        label.modify_font(pango.FontDescription("sans 16"))
+        label.modify_font(pango.FontDescription(self.listing.getReadFont()))
         self.buttons[index].show()
 
     def button_update_clicked(self, button):
@@ -462,7 +454,7 @@ class DisplayFeed(hildon.StackableWindow):
         for index in range(self.feed.getNumberOfEntries()):
             self.feed.setEntryRead(index)
             label = self.buttons[index].child
-            label.modify_font(pango.FontDescription("sans 16"))
+            label.modify_font(pango.FontDescription(self.listing.getReadFont()))
             self.buttons[index].show()
 
 
@@ -486,13 +478,23 @@ class FeedingIt:
         menu.append(button)
         
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
-        button.set_label("Delete Feed")
-        button.connect("clicked", self.button_delete_clicked)
+        button.set_label("Organize Feeds")
+        button.connect("clicked", self.button_organize_clicked)
+        menu.append(button)
+
+        button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
+        button.set_label("Listing Font Size")
+        button.connect("clicked", self.button_font_clicked)
+        menu.append(button)
+       
+        button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
+        button.set_label("Import Feeds")
+        button.connect("clicked", self.button_import_clicked)
         menu.append(button)
         
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
-        button.set_label("Organize Feeds")
-        button.connect("clicked", self.button_organize_clicked)
+        button.set_label("Export Feeds")
+        button.connect("clicked", self.button_export_clicked)
         menu.append(button)
         
         self.window.set_app_menu(menu)
@@ -502,7 +504,17 @@ class FeedingIt:
         self.articleWindow = hildon.StackableWindow()
 
         self.displayListing() 
+
+    def button_export_clicked(self, button):
+        opml = ExportOpmlData(self.window, self.listing)
         
+    def button_import_clicked(self, button):
+        opml = GetOpmlData(self.window)
+        feeds = opml.getData()
+        for (title, url) in feeds:
+            self.listing.addFeed(title, url)
+        self.displayListing()
+
     def button_organize_clicked(self, button):
         org = SortList(self.window, self.listing)
         org.run()
@@ -524,10 +536,11 @@ class FeedingIt:
         disp = DownloadDialog(self.window, self.listing, self.listing.getListOfFeeds() )           
         self.displayListing()
 
-    def button_delete_clicked(self, button):
+    def button_font_clicked(self, button):
         self.pickerDialog = hildon.PickerDialog(self.window)
         #HildonPickerDialog
-        self.pickerDialog.set_selector(self.create_selector())
+        selector = self.create_selector()
+        self.pickerDialog.set_selector(selector)
         self.pickerDialog.show_all()
         
     def create_selector(self):
@@ -535,25 +548,22 @@ class FeedingIt:
         # Selection multiple
         #selector.set_column_selection_mode(hildon.TOUCH_SELECTOR_SELECTION_MODE_MULTIPLE)
         self.mapping = {}
+
+        current_size = self.listing.getFontSize()
+        index = 0
+        for size in range(12,24):
+            iter = selector.append_text(str(size))
+            if str(size) == current_size: 
+                selector.set_active(0, index)
+            index += 1
         selector.connect("changed", self.selection_changed)
-
-        for key in self.listing.getListOfFeeds():
-            title=self.listing.getFeedTitle(key)
-            selector.append_text(title)
-            self.mapping[title]=key
-
         return selector
 
     def selection_changed(self, widget, data):
         current_selection = widget.get_current_text()
-        #print 'Current selection: %s' % current_selection
-        #print "To Delete: %s" % self.mapping[current_selection]
+        if current_selection:
+            self.listing.setFont(current_selection)
         self.pickerDialog.destroy()
-        if self.show_confirmation_note(self.window, current_selection):
-            self.listing.removeFeed(self.mapping[current_selection])
-            self.listing.saveConfig()
-        del self.mapping
-        self.displayListing()
 
     def show_confirmation_note(self, parent, title):
         note = hildon.Note("confirmation", parent, "Are you sure you want to delete " + title +"?")
