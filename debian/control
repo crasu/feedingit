@@ -11,40 +11,49 @@ Package: feedingit
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, python-gtkhtml2, python, python-hildon, libgtkhtml2-0, python-dbus, python-osso
 Description: Simple RSS Reader
- Simple RSS Reader, with portrait mode support, and swipe gestures in articles
+ Simple RSS Reader
+ Its main features are:
+ - Portrait mode support
+ - Auto-update
+ - Swipe left or right while in articles to move to the previous or next article
+ - Import/Export of OPML files
 XB-Maemo-Icon-26:
- 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
+ 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                                                                                                                                     
+ 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
+ WUsq//fg/wAnQYd0SCjJNQAAAABJRU5ErkJggg

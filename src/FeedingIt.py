@@ -40,10 +40,17 @@ from portrait import FremantleRotation
 import threading
 import thread
 from feedingitdbus import ServerObject
+from config import Config
 
 from rss import *
 from opml import GetOpmlData, ExportOpmlData
    
+import socket
+timeout = 5
+socket.setdefaulttimeout(timeout)
+
+CONFIGDIR="/home/user/.feedingit/"
+
 class AddWidgetWizard(hildon.WizardDialog):
     
     def __init__(self, parent, urlIn):
@@ -102,32 +109,61 @@ class AddWidgetWizard(hildon.WizardDialog):
             return True
 
 class GetImage(threading.Thread):
-    def __init__(self, url):
+    def __init__(self, url, stream):
         threading.Thread.__init__(self)
         self.url = url
+        self.stream = stream
     
     def run(self):
         f = urllib2.urlopen(self.url)
-        self.data = f.read()
+        data = f.read()
         f.close()
+        self.stream.write(data)
+        self.stream.close()
 
+class ImageDownloader():
+    def __init__(self):
+        self.images = []
+        self.downloading = False
+        
+    def queueImage(self, url, stream):
+        self.images.append((url, stream))
+        if not self.downloading:
+            self.downloading = True
+            gobject.timeout_add(50, self.checkQueue)
+        
+    def checkQueue(self):
+        for i in range(4-threading.activeCount()):
+            if len(self.images) > 0:
+                (url, stream) = self.images.pop() 
+                GetImage(url, stream).start()
+        if len(self.images)>0:
+            gobject.timeout_add(200, self.checkQueue)
+        else:
+            self.downloading=False
+            
+    def stopAll(self):
+        self.images = []
+            
         
 class Download(threading.Thread):
-    def __init__(self, listing, key):
+    def __init__(self, listing, key, config):
         threading.Thread.__init__(self)
         self.listing = listing
         self.key = key
+        self.config = config
         
     def run (self):
-        self.listing.updateFeed(self.key)
+        self.listing.updateFeed(self.key, self.config.getExpiry())
 
         
 class DownloadDialog():
-    def __init__(self, parent, listing, listOfKeys):
+    def __init__(self, parent, listing, listOfKeys, config):
         self.listOfKeys = listOfKeys[:]
         self.listing = listing
         self.total = len(self.listOfKeys)
-        self.current = 0            
+        self.config = config
+        self.current = 0
         
         if self.total>0:
             self.progress = gtk.ProgressBar()
@@ -143,7 +179,7 @@ class DownloadDialog():
             self.listOfKeys = []
             while threading.activeCount() > 1:
                 # Wait for current downloads to finish
-                time.sleep(0.5)
+                time.sleep(0.1)
             self.waitingWindow.destroy()
         
     def update_progress_bar(self):
@@ -159,7 +195,7 @@ class DownloadDialog():
             if len(self.listOfKeys)>0:
                 self.current = self.current+1
                 key = self.listOfKeys.pop()
-                download = Download(self.listing, key)
+                download = Download(self.listing, key, self.config)
                 download.start()
                 return True
             elif threading.activeCount() > 1:
@@ -279,10 +315,14 @@ class SortList(gtk.Dialog):
                
 
 class DisplayArticle(hildon.StackableWindow):
-    def __init__(self, title, text, index):
+    def __init__(self, title, text, link, index, key, listing):
         hildon.StackableWindow.__init__(self)
+        self.imageDownloader = ImageDownloader()
+        self.listing=listing
+        self.key = key
         self.index = index
         self.text = text
+        self.link = link
         self.set_title(title)
         self.images = []
         
@@ -306,44 +346,60 @@ class DisplayArticle(hildon.StackableWindow):
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
         button.set_label("Allow Horizontal Scrolling")
         button.connect("clicked", self.horiz_scrolling_button)
-        
         menu.append(button)
+        
+        button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
+        button.set_label("Open in Browser")
+        button.connect("clicked", self._signal_link_clicked, self.link)
+        menu.append(button)
+        
+        button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
+        button.set_label("Add to Archived Articles")
+        button.connect("clicked", self.archive_button)
+        menu.append(button)
+        
         self.set_app_menu(menu)
         menu.show_all()
         
         self.add(self.pannable_article)
         
-        self.show_all()
+        self.pannable_article.show_all()
 
         self.destroyId = self.connect("destroy", self.destroyWindow)
-        self.timeout_handler_id = gobject.timeout_add(300, self.reloadArticle)
+        #self.timeout_handler_id = gobject.timeout_add(300, self.reloadArticle)
 
     def gesture(self, widget, direction, startx, starty):
         if (direction == 3):
             self.emit("article-next", self.index)
         if (direction == 2):
             self.emit("article-previous", self.index)
-        self.timeout_handler_id = gobject.timeout_add(200, self.destroyWindow)
+        #self.timeout_handler_id = gobject.timeout_add(200, self.destroyWindow)
 
     def destroyWindow(self, *args):
+        self.disconnect(self.destroyId)
         self.emit("article-closed", self.index)
+        self.imageDownloader.stopAll()
         self.destroy()
         
     def horiz_scrolling_button(self, *widget):
         self.pannable_article.disconnect(self.gestureId)
         self.pannable_article.set_property("mov-mode", hildon.MOVEMENT_MODE_BOTH)
         
-    def reloadArticle(self, *widget):
-        if threading.activeCount() > 1:
+    def archive_button(self, *widget):
+        # Call the listing.addArchivedArticle
+        self.listing.addArchivedArticle(self.key, self.index)
+        
+    #def reloadArticle(self, *widget):
+    #    if threading.activeCount() > 1:
             # Image thread are still running, come back in a bit
-            return True
-        else:
-            for (stream, imageThread) in self.images:
-                imageThread.join()
-                stream.write(imageThread.data)
-                stream.close()
-            return False
-        self.show_all()
+    #        return True
+    #    else:
+    #        for (stream, imageThread) in self.images:
+    #            imageThread.join()
+    #            stream.write(imageThread.data)
+    #            stream.close()
+    #        return False
+    #    self.show_all()
 
     def _signal_link_clicked(self, object, link):
         bus = dbus.SystemBus()
@@ -352,25 +408,31 @@ class DisplayArticle(hildon.StackableWindow):
         iface.open_new_window(link)
 
     def _signal_request_url(self, object, url, stream):
-        imageThread = GetImage(url)
-        imageThread.start()
-        self.images.append((stream, imageThread))
+        #print url
+        self.imageDownloader.queueImage(url, stream)
+        #imageThread = GetImage(url)
+        #imageThread.start()
+        #self.images.append((stream, imageThread))
 
 
 class DisplayFeed(hildon.StackableWindow):
-    def __init__(self, listing, feed, title, key):
+    def __init__(self, listing, feed, title, key, config):
         hildon.StackableWindow.__init__(self)
         self.listing = listing
         self.feed = feed
         self.feedTitle = title
         self.set_title(title)
         self.key=key
+        self.config = config
+        
+        self.disp = False
         
         menu = hildon.AppMenu()
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
         button.set_label("Update Feed")
         button.connect("clicked", self.button_update_clicked)
         menu.append(button)
+        
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
         button.set_label("Mark All As Read")
         button.connect("clicked", self.buttonReadAllClicked)
@@ -385,7 +447,7 @@ class DisplayFeed(hildon.StackableWindow):
     def destroyWindow(self, *args):
         self.emit("feed-closed", self.key)
         self.destroy()
-        self.feed.saveFeed()
+        self.feed.saveFeed(CONFIGDIR)
 
     def displayFeed(self):
         self.vboxFeed = gtk.VBox(False, 10)
@@ -399,10 +461,10 @@ class DisplayFeed(hildon.StackableWindow):
             label = button.child
             if self.feed.isEntryRead(index):
                 #label.modify_font(pango.FontDescription("sans 16"))
-                label.modify_font(pango.FontDescription(self.listing.getReadFont()))
+                label.modify_font(pango.FontDescription(self.config.getReadFont()))
             else:
                 #print self.listing.getFont() + " bold"
-                label.modify_font(pango.FontDescription(self.listing.getUnreadFont()))
+                label.modify_font(pango.FontDescription(self.config.getUnreadFont()))
                 #label.modify_font(pango.FontDescription("sans bold 23"))
                 #"sans bold 16"
             label.set_line_wrap(True)
@@ -419,33 +481,52 @@ class DisplayFeed(hildon.StackableWindow):
         
     def clear(self):
         self.remove(self.pannableFeed)
-        
-    def button_clicked(self, button, index):
-        self.disp = DisplayArticle(self.feedTitle, self.feed.getArticle(index), index)
+
+    def button_clicked(self, button, index, previous=False):
+        newDisp = DisplayArticle(self.feedTitle, self.feed.getArticle(index), self.feed.getLink(index), index, self.key, self.listing)
         self.ids = []
-        self.ids.append(self.disp.connect("article-closed", self.onArticleClosed))
-        self.ids.append(self.disp.connect("article-next", self.nextArticle))
-        self.ids.append(self.disp.connect("article-previous", self.previousArticle))
+        self.ids.append(newDisp.connect("article-closed", self.onArticleClosed))
+        self.ids.append(newDisp.connect("article-next", self.nextArticle))
+        self.ids.append(newDisp.connect("article-previous", self.previousArticle))
+        stack = hildon.WindowStack.get_default()
+        if previous:
+            tmp = stack.pop(1)
+            stack.push(newDisp)
+            del tmp
+            newDisp.show_all()
+            #stack.push(tmp)
+            #if not self.disp == False:
+            #   self.disp.destroyWindow()
+        else:
+            if not self.disp == False:
+                #stack.pop(1)
+                stack.pop_and_push(1,newDisp)
+            else:
+                stack.push(newDisp)
+            #newDisp.show_all()
+            #if not self.disp == False:
+                #self.disp.destroyWindow()
+        self.disp = newDisp
 
     def nextArticle(self, object, index):
         label = self.buttons[index].child
-        label.modify_font(pango.FontDescription(self.listing.getReadFont()))
+        label.modify_font(pango.FontDescription(self.config.getReadFont()))
         index = (index+1) % self.feed.getNumberOfEntries()
         self.button_clicked(object, index)
 
     def previousArticle(self, object, index):
         label = self.buttons[index].child
-        label.modify_font(pango.FontDescription(self.listing.getReadFont()))
+        label.modify_font(pango.FontDescription(self.config.getReadFont()))
         index = (index-1) % self.feed.getNumberOfEntries()
-        self.button_clicked(object, index)
+        self.button_clicked(object, index, True)
 
     def onArticleClosed(self, object, index):
         label = self.buttons[index].child
-        label.modify_font(pango.FontDescription(self.listing.getReadFont()))
+        label.modify_font(pango.FontDescription(self.config.getReadFont()))
         self.buttons[index].show()
 
     def button_update_clicked(self, button):
-        disp = DownloadDialog(self, self.listing, [self.key,] )       
+        disp = DownloadDialog(self, self.listing, [self.key,], self.config )       
         #self.feed.updateFeed()
         self.clear()
         self.displayFeed()
@@ -454,16 +535,17 @@ class DisplayFeed(hildon.StackableWindow):
         for index in range(self.feed.getNumberOfEntries()):
             self.feed.setEntryRead(index)
             label = self.buttons[index].child
-            label.modify_font(pango.FontDescription(self.listing.getReadFont()))
+            label.modify_font(pango.FontDescription(self.config.getReadFont()))
             self.buttons[index].show()
 
 
 class FeedingIt:
     def __init__(self):
-        self.listing = Listing()
+        self.listing = Listing(CONFIGDIR)
         
         # Init the windows
         self.window = hildon.StackableWindow()
+        self.config = Config(self.window, CONFIGDIR+"config.ini")
         self.window.set_title("FeedingIt")
         FremantleRotation("FeedingIt", main_window=self.window)
         menu = hildon.AppMenu()
@@ -472,6 +554,7 @@ class FeedingIt:
         button.set_label("Update All Feeds")
         button.connect("clicked", self.button_update_clicked, "All")
         menu.append(button)
+        
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
         button.set_label("Add Feed")
         button.connect("clicked", self.button_add_clicked)
@@ -483,8 +566,8 @@ class FeedingIt:
         menu.append(button)
 
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
-        button.set_label("Listing Font Size")
-        button.connect("clicked", self.button_font_clicked)
+        button.set_label("Preferences")
+        button.connect("clicked", self.button_preferences_clicked)
         menu.append(button)
        
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
@@ -503,7 +586,10 @@ class FeedingIt:
         self.feedWindow = hildon.StackableWindow()
         self.articleWindow = hildon.StackableWindow()
 
-        self.displayListing() 
+        self.displayListing()
+        self.autoupdate = False
+        self.checkAutoUpdate()
+
 
     def button_export_clicked(self, button):
         opml = ExportOpmlData(self.window, self.listing)
@@ -533,37 +619,12 @@ class FeedingIt:
         self.displayListing()
         
     def button_update_clicked(self, button, key):
-        disp = DownloadDialog(self.window, self.listing, self.listing.getListOfFeeds() )           
+        disp = DownloadDialog(self.window, self.listing, self.listing.getListOfFeeds(), self.config )           
         self.displayListing()
 
-    def button_font_clicked(self, button):
-        self.pickerDialog = hildon.PickerDialog(self.window)
-        #HildonPickerDialog
-        selector = self.create_selector()
-        self.pickerDialog.set_selector(selector)
-        self.pickerDialog.show_all()
-        
-    def create_selector(self):
-        selector = hildon.TouchSelector(text=True)
-        # Selection multiple
-        #selector.set_column_selection_mode(hildon.TOUCH_SELECTOR_SELECTION_MODE_MULTIPLE)
-        self.mapping = {}
-
-        current_size = self.listing.getFontSize()
-        index = 0
-        for size in range(12,24):
-            iter = selector.append_text(str(size))
-            if str(size) == current_size: 
-                selector.set_active(0, index)
-            index += 1
-        selector.connect("changed", self.selection_changed)
-        return selector
-
-    def selection_changed(self, widget, data):
-        current_selection = widget.get_current_text()
-        if current_selection:
-            self.listing.setFont(current_selection)
-        self.pickerDialog.destroy()
+    def button_preferences_clicked(self, button):
+        dialog = self.config.createDialog()
+        dialog.connect("destroy", self.checkAutoUpdate)
 
     def show_confirmation_note(self, parent, title):
         note = hildon.Note("confirmation", parent, "Are you sure you want to delete " + title +"?")
@@ -600,19 +661,36 @@ class FeedingIt:
         self.window.show_all()
 
     def buttonFeedClicked(widget, button, self, window, key):
-        disp = DisplayFeed(self.listing, self.listing.getFeed(key), self.listing.getFeedTitle(key), key)
+        disp = DisplayFeed(self.listing, self.listing.getFeed(key), self.listing.getFeedTitle(key), key, self.config)
         disp.connect("feed-closed", self.onFeedClosed)
 
     def onFeedClosed(self, object, key):
-        self.buttons[key].set_text(self.listing.getFeedTitle(key), self.listing.getFeedUpdateTime(key) + " / " 
-                            + str(self.listing.getFeedNumberOfUnreadItems(key)) + " Unread Items")
-        self.buttons[key].show()
+        self.displayListing()
+        #self.buttons[key].set_text(self.listing.getFeedTitle(key), self.listing.getFeedUpdateTime(key) + " / " 
+        #                    + str(self.listing.getFeedNumberOfUnreadItems(key)) + " Unread Items")
+        #self.buttons[key].show()
      
     def run(self):
         self.window.connect("destroy", gtk.main_quit)
         gtk.main()
         self.listing.saveConfig()
 
+    def checkAutoUpdate(self, *widget):
+        if self.config.isAutoUpdateEnabled():
+            if not self.autoupdate:
+                self.autoupdateId = gobject.timeout_add(int(self.config.getUpdateInterval()*3600000), self.automaticUpdate)
+                self.autoupdate = True
+        else:
+            if self.autoupdate:
+                gobject.source_remove(self.autoupdateId)
+                self.autoupdate = False
+
+    def automaticUpdate(self, *widget):
+        # Need to check for internet connection
+        # If no internet connection, try again in 10 minutes:
+        # gobject.timeout_add(int(5*3600000), self.automaticUpdate)
+        self.button_update_clicked(None, None)
+        return True
 
 if __name__ == "__main__":
     gobject.signal_new("feed-closed", DisplayFeed, gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,))

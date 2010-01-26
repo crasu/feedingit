@@ -93,7 +93,8 @@ class ExportOpmlData():
         for key in listing.getListOfFeeds():
             title = listing.getFeedTitle(key)
             url = listing.getFeedUrl(key)
-            opml_text += """\n\t\t<outline  type="rss" text="%s" title="%s" xmlUrl="%s"/>""" % (title, title, url)
+            if not title == "Archived Articles": 
+                opml_text += """\n\t\t<outline  type="rss" text="%s" title="%s" xmlUrl="%s"/>""" % (title, title, url)
         opml_text += """\n</body>\n</opml>\n"""
         return opml_text
         

@@ -1,3 +1,9 @@
+feedingit (0.3.1-1) unstable; urgency=low
+
+  * Fixed socket timeouts
+  
+ -- Yves <yves@marcoz.org>  Sat, 23 Jan 2010 13:31:19 -0800
+
 feedingit (0.2.3-2) unstable; urgency=low
 
   * Fixed missing python-osso dependency

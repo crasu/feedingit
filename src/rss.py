@@ -30,8 +30,9 @@ import pickle
 import md5
 import feedparser
 import time
+import urllib2
 
-CONFIGDIR="/home/user/.feedingit/"
+#CONFIGDIR="/home/user/.feedingit/"
 
 def getId(string):
     return md5.new(string).hexdigest()
@@ -40,44 +41,52 @@ class Feed:
     # Contains all the info about a single feed (articles, ...), and expose the data
     def __init__(self, name, url):
         self.entries = []
-        self.fontSize = "+0"
         self.readItems = {}
         self.countUnread = 0
         self.name = name
         self.url = url
         self.updateTime = "Never"
 
-    def getFontSize(self):
-        try:
-            return self.fontSize
-        except:
-            self.fontSize = "+0"
-            return self.fontSize
-
-    def saveFeed(self):
-        file = open(CONFIGDIR+getId(self.name), "w")
+    def saveFeed(self, configdir):
+        file = open(configdir+getId(self.name), "w")
         pickle.dump(self, file )
         file.close()
 
-    def updateFeed(self):
+    def updateFeed(self, configdir, expiryTime=24):
+        # Expiry time is in hours
         tmp=feedparser.parse(self.url)
         # Check if the parse was succesful (number of entries > 0, else do nothing)
         if len(tmp["entries"])>0:
-           self.tmpReadItems = self.readItems
-           self.readItems = {}
-           self.updateTime = time.asctime()
+           #reversedEntries = self.getEntries()
+           #reversedEntries.reverse()
+           tmpIds = []
+           for entry in tmp["entries"]:
+               tmpIds.append(self.getUniqueId(-1, entry))
+           for entry in self.getEntries():
+               currentTime = time.time()
+               expiry = float(expiryTime) * 3600.
+               if entry.has_key("updated_parsed"):
+                   articleTime = time.mktime(entry["updated_parsed"])
+                   if currentTime - articleTime < expiry:
+                       id = self.getUniqueId(-1, entry)
+                       if not id in tmpIds:
+                           tmp["entries"].append(entry)
+                   
            self.entries = tmp["entries"]
            self.countUnread = 0
            # Initialize the new articles to unread
+           tmpReadItems = self.readItems
+           self.readItems = {}
            for index in range(self.getNumberOfEntries()):
-               if not self.tmpReadItems.has_key(self.getUniqueId(index)):
+               if not tmpReadItems.has_key(self.getUniqueId(index)):
                    self.readItems[self.getUniqueId(index)] = False
                else:
-                   self.readItems[self.getUniqueId(index)] = self.tmpReadItems[self.getUniqueId(index)]
+                   self.readItems[self.getUniqueId(index)] = tmpReadItems[self.getUniqueId(index)]
                if self.readItems[self.getUniqueId(index)]==False:
                   self.countUnread = self.countUnread + 1
            del tmp
-           self.saveFeed()
+           self.updateTime = time.asctime()
+           self.saveFeed(configdir)
     
     def setEntryRead(self, index):
         if self.readItems[self.getUniqueId(index)]==False:
@@ -90,8 +99,18 @@ class Feed:
     def getTitle(self, index):
         return self.entries[index]["title"]
     
-    def getUniqueId(self,index):
-        entry = self.entries[index]
+    def getLink(self, index):
+        return self.entries[index]["link"]
+    
+    def getDate(self, index):
+        try:
+            return self.entries[index]["updated_parsed"]
+        except:
+            return time.localtime()
+    
+    def getUniqueId(self, index, entry=None):
+        if index >=0:
+            entry = self.entries[index]
         if entry.has_key("updated_parsed"):
             return getId(time.strftime("%a, %d %b %Y %H:%M:%S",entry["updated_parsed"]) + entry["title"])
         elif entry.has_key("link"):
@@ -150,19 +169,56 @@ class Feed:
         text += content
         return text    
 
+class ArchivedArticles(Feed):
+    def addArchivedArticle(self, title, link, updated_parsed, configdir):
+        entry = {}
+        entry["title"] = title
+        entry["link"] = link
+        entry["downloaded"] = False
+        entry["summary"] = '<a href=\"' + link + '\">' + title + "</a>"
+        entry["updated_parsed"] = updated_parsed
+        self.entries.append(entry)
+        self.readItems[self.getUniqueId(len(self.entries)-1)] = False
+        self.countUnread = self.countUnread + 1
+        self.saveFeed(configdir)
+        #print entry
+        
+    def updateFeed(self, configdir, expiryTime=24):
+        for entry in self.getEntries():
+            if not entry["downloaded"]:
+                try:
+                    f = urllib2.urlopen(entry["link"])
+                    entry["summary"] = f.read()
+                    f.close()
+                    entry["downloaded"] = True
+                    entry["time"] = time.time()
+                except:
+                    pass
+            currentTime = time.time()
+            expiry = float(expiryTime) * 3600
+            if currentTime - entry["time"] > expiry:
+                self.entries.remove(entry)
+        self.saveFeed(configdir)
+
+    def getArticle(self, index):
+        self.setEntryRead(index)
+        content = self.getContent(index)
+        return content
+
 
 class Listing:
     # Lists all the feeds in a dictionary, and expose the data
-    def __init__(self):
+    def __init__(self, configdir):
+        self.configdir = configdir
         self.feeds = {}
-        if isfile(CONFIGDIR+"feeds.pickle"):
-            file = open(CONFIGDIR+"feeds.pickle")
+        if isfile(self.configdir+"feeds.pickle"):
+            file = open(self.configdir+"feeds.pickle")
             self.listOfFeeds = pickle.load(file)
             file.close()
         else:
             self.listOfFeeds = {getId("Slashdot"):{"title":"Slashdot", "url":"http://rss.slashdot.org/Slashdot/slashdot"}, }
-        if not self.listOfFeeds.has_key("font"):
-            self.setFont("16")
+        if self.listOfFeeds.has_key("font"):
+            del self.listOfFeeds["font"]
         if self.listOfFeeds.has_key("feedingit-order"):
             self.sortedKeys = self.listOfFeeds["feedingit-order"]
         else:
@@ -176,22 +232,22 @@ class Listing:
             except:
                 self.sortedKeys.remove(key)
         #self.saveConfig()
-        
-    def getFontSize(self):
-        return self.listOfFeeds["font"]
-    
-    def getReadFont(self):
-        return "sans %s" % self.listOfFeeds["font"]
-    
-    def getUnreadFont(self):
-        return "sans bold %s" % self.listOfFeeds["font"]
-    
-    def setFont(self, fontname):
-        self.listOfFeeds["font"] = fontname
+
+    def addArchivedArticle(self, key, index):
+        title = self.getFeed(key).getTitle(index)
+        link = self.getFeed(key).getLink(index)
+        date = self.getFeed(key).getDate(index)
+        if not self.listOfFeeds.has_key(getId("Archived Articles")):
+            self.listOfFeeds[getId("Archived Articles")] = {"title":"Archived Articles", "url":""}
+            self.sortedKeys.append(getId("Archived Articles"))
+            self.feeds[getId("Archived Articles")] = ArchivedArticles("Archived Articles", "")
+            self.saveConfig()
+            
+        self.getFeed(getId("Archived Articles")).addArchivedArticle(title, link, date, self.configdir)
         
     def loadFeed(self, key):
-            if isfile(CONFIGDIR+key):
-                file = open(CONFIGDIR+key)
+            if isfile(self.configdir+key):
+                file = open(self.configdir+key)
                 self.feeds[key] = pickle.load(file)
                 file.close()
             else:
@@ -199,12 +255,12 @@ class Listing:
                 url = self.listOfFeeds[key]["url"]
                 self.feeds[key] = Feed(title, url)
         
-    def updateFeeds(self):
+    def updateFeeds(self, expiryTime=24):
         for key in self.getListOfFeeds():
-            self.feeds[key].updateFeed()
+            self.feeds[key].updateFeed(self.configdir, expiryTime)
             
-    def updateFeed(self, key):
-        self.feeds[key].updateFeed()
+    def updateFeed(self, key, expiryTime=24):
+        self.feeds[key].updateFeed(self.configdir, expiryTime)
             
     def getFeed(self, key):
         return self.feeds[key]
@@ -235,12 +291,12 @@ class Listing:
         del self.listOfFeeds[key]
         self.sortedKeys.remove(key)
         del self.feeds[key]
-        if isfile(CONFIGDIR+key):
-           remove(CONFIGDIR+key)
+        if isfile(self.configdir+key):
+           remove(self.configdir+key)
     
     def saveConfig(self):
         self.listOfFeeds["feedingit-order"] = self.sortedKeys
-        file = open(CONFIGDIR+"feeds.pickle", "w")
+        file = open(self.configdir+"feeds.pickle", "w")
         pickle.dump(self.listOfFeeds, file)
         file.close()
         
