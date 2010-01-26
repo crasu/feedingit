@@ -1,3 +1,19 @@
+feedingit (0.4.1-2) unstable; urgency=low
+
+  * Changing waiting period for article windows animation
+  
+ -- Yves <yves@marcoz.org>  Tue, 26 Jan 2010 07:57:19 -0800
+
+feedingit (0.4.1-1) unstable; urgency=low
+
+  * New icons from claesbas!
+  * Auto-updates of feeds
+  * Support for archived articles
+  * Configuration window
+  * Expiry of articles based on time, rather than new update content
+  
+ -- Yves <yves@marcoz.org>  Tue, 26 Jan 2010 07:39:19 -0800
+
 feedingit (0.3.1-1) unstable; urgency=low
 
   * Fixed socket timeouts

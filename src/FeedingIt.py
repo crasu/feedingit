@@ -19,7 +19,7 @@
 # ============================================================================
 # Name        : FeedingIt.py
 # Author      : Yves Marcoz
-# Version     : 0.2.2
+# Version     : 0.4.1
 # Description : Simple RSS Reader
 # ============================================================================
 
@@ -482,7 +482,7 @@ class DisplayFeed(hildon.StackableWindow):
     def clear(self):
         self.remove(self.pannableFeed)
 
-    def button_clicked(self, button, index, previous=False):
+    def button_clicked(self, button, index, previous=False, next=False):
         newDisp = DisplayArticle(self.feedTitle, self.feed.getArticle(index), self.feed.getLink(index), index, self.key, self.listing)
         self.ids = []
         self.ids.append(newDisp.connect("article-closed", self.onArticleClosed))
@@ -491,34 +491,54 @@ class DisplayFeed(hildon.StackableWindow):
         stack = hildon.WindowStack.get_default()
         if previous:
             tmp = stack.pop(1)
-            stack.push(newDisp)
-            del tmp
+            stack.push_list([newDisp, tmp[0]])
+            #del tmp
             newDisp.show_all()
+            gobject.timeout_add(500, self.destroyArticle, tmp[0])
+            #print "previous"
+            self.disp = newDisp
+            
             #stack.push(tmp)
             #if not self.disp == False:
             #   self.disp.destroyWindow()
-        else:
-            if not self.disp == False:
-                #stack.pop(1)
-                stack.pop_and_push(1,newDisp)
-            else:
-                stack.push(newDisp)
-            #newDisp.show_all()
-            #if not self.disp == False:
+        elif next:
+            #print type(self.disp).__name__
+
                 #self.disp.destroyWindow()
-        self.disp = newDisp
+                #stack.pop_and_push(1,newDisp)
+            #else:
+            #    stack.push(newDisp)
+            #self.disp = newDisp
+            newDisp.show_all()
+            if type(self.disp).__name__ == "DisplayArticle":
+                #tmp = stack.pop(2)
+                #stack.push(self.disp)
+                #stack.pop_and_push(1)
+                #self.disp.hide()
+                #print "Done"
+                gobject.timeout_add(500, self.destroyArticle, self.disp)
+            self.disp = newDisp
+            #self.disp.show_all()
+            #if not self.disp == False:
+            #    self.disp.destroyWindow()
+        else:
+            self.disp = newDisp
+            self.disp.show_all()
+
+    def destroyArticle(self, handle):
+        handle.destroyWindow()
 
     def nextArticle(self, object, index):
         label = self.buttons[index].child
         label.modify_font(pango.FontDescription(self.config.getReadFont()))
         index = (index+1) % self.feed.getNumberOfEntries()
-        self.button_clicked(object, index)
+        self.button_clicked(object, index, next=True)
 
     def previousArticle(self, object, index):
         label = self.buttons[index].child
         label.modify_font(pango.FontDescription(self.config.getReadFont()))
         index = (index-1) % self.feed.getNumberOfEntries()
-        self.button_clicked(object, index, True)
+        self.button_clicked(object, index, previous=True)
 
     def onArticleClosed(self, object, index):
         label = self.buttons[index].child
