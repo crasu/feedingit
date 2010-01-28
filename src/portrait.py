@@ -23,10 +23,6 @@ import dbus.glib
 import hildon
 import osso
 
-# Replace this with your own gettext() functionality
-#import gpodder
-#_ = gpodder.gettext
-
 
 class FremantleRotation(object):
     """thp's screen rotation for Maemo 5
@@ -43,7 +39,7 @@ class FremantleRotation(object):
     AUTOMATIC, NEVER, ALWAYS = range(3)
 
     # Human-readable captions for the above constants
-    #MODE_CAPTIONS = (_('Automatic'), _('Landscape'), _('Portrait'))
+    MODE_CAPTIONS = ("Automatic", "Landscape", "Portrait")
 
     # Privately-used constants
     _PORTRAIT, _LANDSCAPE = ('portrait', 'landscape')
@@ -67,9 +63,9 @@ class FremantleRotation(object):
         self._main_window = main_window
         self._stack = hildon.WindowStack.get_default()
         self._mode = -1
-        self._last_dbus_orientation = None
         app_id = '-'.join((app_name, self.__class__.__name__))
         self._osso_context = osso.Context(app_id, version, False)
+        self._last_dbus_orientation = self._get_current_orientation()
         program = hildon.Program.get_instance()
         program.connect('notify::is-topmost', self._on_topmost_changed)
         system_bus = dbus.Bus.get_system()
@@ -78,6 +74,18 @@ class FremantleRotation(object):
                 dbus_interface='com.nokia.mce.signal', \
                 path='/com/nokia/mce/signal')
         self.set_mode(mode)
+
+    def _get_current_orientation(self):
+        """Return the current orientation
+        
+        Returns portrait if in portrait mode for sure, landscape if
+        in landscape mode or unknown.
+        """
+        if self._send_mce_request('get_device_orientation', True) \
+                == self._PORTRAIT:
+            return self._PORTRAIT
+        else:
+            return self._LANDSCAPE
 
     def get_mode(self):
         """Get the currently-set rotation mode
@@ -114,12 +122,13 @@ class FremantleRotation(object):
 
             self._mode = new_mode
 
-    def _send_mce_request(self, request):
+    def _send_mce_request(self, request, wait_reply=False):
         rpc = osso.Rpc(self._osso_context)
-        rpc.rpc_run(self._MCE_SERVICE, \
-                    self._MCE_REQUEST_PATH, \
-                    self._MCE_REQUEST_IF, \
-                    request, \
+        return rpc.rpc_run(self._MCE_SERVICE,
+                    self._MCE_REQUEST_PATH,
+                    self._MCE_REQUEST_IF,
+                    request,
+                    wait_reply=wait_reply,
                     use_system_bus=True)
 
     def _on_topmost_changed(self, program, property_spec):
@@ -169,4 +178,3 @@ class FremantleRotation(object):
                 # Ignore orientation changes for non-automatic modes, but save
                 # the current orientation for "automatic" mode later on
                 self._last_dbus_orientation = orientation
-

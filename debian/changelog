@@ -1,3 +1,17 @@
+feedingit (0.4.2-5) unstable; urgency=low
+
+  * Background save of feeds to disk
+  * Added edit feed button
+  
+ -- Yves <yves@marcoz.org>  Tue, 27 Jan 2010 09:12:19 -0800
+
+feedingit (0.4.2-0) unstable; urgency=low
+
+  * Configuration of orientation
+  * Feed updates in the background
+  
+ -- Yves <yves@marcoz.org>  Tue, 27 Jan 2010 09:12:19 -0800
+
 feedingit (0.4.1-2) unstable; urgency=low
 
   * Changing waiting period for article windows animation

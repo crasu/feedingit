@@ -21,5 +21,7 @@ install:
 	install data/40px.png ${DESTDIR}/usr/share/icons/hicolor/40x40/apps/feedingit.png
 	install -d ${DESTDIR}/usr/share/icons/hicolor/26x26/apps/
 	install data/26px.png ${DESTDIR}/usr/share/icons/hicolor/26x26/apps/feedingit.png
+	install -d ${DESTDIR}/usr/share/icons/hicolor/64x64/apps/
+	install data/64px.png ${DESTDIR}/usr/share/icons/hicolor/64x64/apps/feedingit.png
 	install -d ${DESTDIR}/usr/share/dbus-1/services/
 	install src/feedingit.service ${DESTDIR}/usr/share/dbus-1/services/

@@ -47,6 +47,9 @@ class Feed:
         self.url = url
         self.updateTime = "Never"
 
+    def editFeed(self, url):
+        self.url = url
+
     def saveFeed(self, configdir):
         file = open(configdir+getId(self.name), "w")
         pickle.dump(self, file )
@@ -143,8 +146,10 @@ class Feed:
         entry = self.entries[index]
         if entry.has_key('content'):
             content = entry.content[0].value
-        else:
+        elif entry.has_key('summary'):
             content = entry.get('summary', '')
+        else:
+            content = entry.get('description', '')
         return content
     
     def getArticle(self, index):
@@ -177,6 +182,7 @@ class ArchivedArticles(Feed):
         entry["downloaded"] = False
         entry["summary"] = '<a href=\"' + link + '\">' + title + "</a>"
         entry["updated_parsed"] = updated_parsed
+        entry["time"] = time.time()
         self.entries.append(entry)
         self.readItems[self.getUniqueId(len(self.entries)-1)] = False
         self.countUnread = self.countUnread + 1
@@ -190,14 +196,16 @@ class ArchivedArticles(Feed):
                     f = urllib2.urlopen(entry["link"])
                     entry["summary"] = f.read()
                     f.close()
-                    entry["downloaded"] = True
-                    entry["time"] = time.time()
+                    if len(entry["summary"]) > 0:
+                        entry["downloaded"] = True
+                        entry["time"] = time.time()
                 except:
                     pass
             currentTime = time.time()
             expiry = float(expiryTime) * 3600
             if currentTime - entry["time"] > expiry:
                 self.entries.remove(entry)
+        self.updateTime = time.asctime()
         self.saveFeed(configdir)
 
     def getArticle(self, index):
@@ -231,6 +239,7 @@ class Listing:
                 self.loadFeed(key)
             except:
                 self.sortedKeys.remove(key)
+        self.closeCurrentlyDisplayedFeed()
         #self.saveConfig()
 
     def addArchivedArticle(self, key, index):
@@ -261,6 +270,11 @@ class Listing:
             
     def updateFeed(self, key, expiryTime=24):
         self.feeds[key].updateFeed(self.configdir, expiryTime)
+        
+    def editFeed(self, key, url, title):
+        self.listOfFeeds[key]["title"] = title
+        self.listOfFeeds[key]["url"] = url
+        self.feeds[key].editFeed(url)
             
     def getFeed(self, key):
         return self.feeds[key]
@@ -286,6 +300,9 @@ class Listing:
             self.sortedKeys.append(getId(title))
             self.saveConfig()
             self.feeds[getId(title)] = Feed(title, url)
+            return True
+        else:
+            return False
         
     def removeFeed(self, key):
         del self.listOfFeeds[key]
@@ -310,3 +327,10 @@ class Listing:
         index2 = (index+1)%len(self.sortedKeys)
         self.sortedKeys[index] = self.sortedKeys[index2]
         self.sortedKeys[index2] = key
+        
+    def setCurrentlyDisplayedFeed(self, key):
+        self.currentlyDisplayedFeed = key
+    def closeCurrentlyDisplayedFeed(self):
+        self.currentlyDisplayedFeed = False
+    def getCurrentlyDisplayedFeed(self):
+        return self.currentlyDisplayedFeed

@@ -29,9 +29,9 @@ import ConfigParser
 import gobject
 
 section = "FeedingIt"
-ranges = { "updateInterval":[0.02, 0.5, 1, 2, 4, 12, 24], "expiry":[24, 48, 72], "fontSize":range(12,24) }
-titles = {"updateInterval":"Auto-update Interval", "expiry":"Expiry For Articles", "fontSize":"Font Size For Article Listing"}
-subtitles = {"updateInterval":"Update every %s hours", "expiry":"Delete articles after %s hours", "fontSize":"%s pixels"}
+ranges = { "updateInterval":[0.02, 0.5, 1, 2, 4, 12, 24], "expiry":[24, 48, 72], "fontSize":range(12,24), "orientation":["Automatic", "Landscape", "Portrait"]}
+titles = {"updateInterval":"Auto-update Interval", "expiry":"Expiry For Articles", "fontSize":"Font Size For Article Listing", "orientation":"Display Orientation"}
+subtitles = {"updateInterval":"Update every %s hours", "expiry":"Delete articles after %s hours", "fontSize":"%s pixels", "orientation":"%s"}
 
 class Config():
     def __init__(self, parent, configFilename):
@@ -45,7 +45,7 @@ class Config():
         self.window = gtk.Dialog("Preferences", self.parent)
         #self.vbox = gtk.VBox(False, 10)
         self.buttons = {}
-        for setting in ["fontSize", "expiry", "updateInterval"]:
+        for setting in ["fontSize", "expiry", "orientation", "updateInterval",]:
             picker = hildon.PickerButton(gtk.HILDON_SIZE_FINGER_HEIGHT, hildon.BUTTON_ARRANGEMENT_VERTICAL)
             selector = self.create_selector(ranges[setting], setting)
             picker.set_selector(selector)
@@ -100,11 +100,13 @@ class Config():
             self.config["expiry"] = configParser.getint(section, "expiry")
             self.config["autoupdate"] = configParser.getboolean(section, "autoupdate")
             self.config["updateInterval"] = configParser.getfloat(section, "updateInterval")
+            self.config["orientation"] = configParser.get(section, "orientation")
         except:
             self.config["fontSize"] = 16
             self.config["expiry"] = 24
             self.config["autoupdate"] = False
             self.config["updateInterval"] = 4
+            self.config["orientation"] = "Automatic"
         
     def saveConfig(self):
         configParser = ConfigParser.RawConfigParser()
@@ -113,6 +115,7 @@ class Config():
         configParser.set(section, 'expiry', str(self.config["expiry"]))
         configParser.set(section, 'autoupdate', str(self.config["autoupdate"]))
         configParser.set(section, 'updateInterval', str(self.config["updateInterval"]))
+        configParser.set(section, 'orientation', str(self.config["orientation"]))
 
         # Writing our configuration file
         file = open(self.configFilename, 'wb')
@@ -145,3 +148,5 @@ class Config():
         return "sans %s" % self.config["fontSize"]
     def getUnreadFont(self):
         return "sans bold %s" % self.config["fontSize"]
+    def getOrientation(self):
+        return ranges["orientation"].index(self.config["orientation"])
