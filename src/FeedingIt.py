@@ -326,7 +326,7 @@ class SortList(gtk.Dialog):
     def buttonEdit(self, button):
         key = self.getSelectedItem()
         if not key == None:
-            wizard = AddWidgetWizard(self.window, self.listing.getFeedUrl(key), self.listing.getFeedTitle(key))
+            wizard = AddWidgetWizard(self, self.listing.getFeedUrl(key), self.listing.getFeedTitle(key))
             ret = wizard.run()
             if ret == 2:
                 (title, url) = wizard.getData()
@@ -334,7 +334,6 @@ class SortList(gtk.Dialog):
                     self.listing.editFeed(key, title, url)
             wizard.destroy()
         self.refreshList()
-        self.displayListing()
 
     def buttonDone(self, *args):
         self.destroy()
@@ -458,7 +457,7 @@ class DisplayFeed(hildon.StackableWindow):
         
         self.disp = False
         
-        #menu = hildon.AppMenu()
+        menu = hildon.AppMenu()
         #button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
         #button.set_label("Update Feed")
         #button.connect("clicked", self.button_update_clicked)

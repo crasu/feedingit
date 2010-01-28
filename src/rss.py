@@ -271,7 +271,7 @@ class Listing:
     def updateFeed(self, key, expiryTime=24):
         self.feeds[key].updateFeed(self.configdir, expiryTime)
         
-    def editFeed(self, key, url, title):
+    def editFeed(self, key, title, url):
         self.listOfFeeds[key]["title"] = title
         self.listOfFeeds[key]["url"] = url
         self.feeds[key].editFeed(url)

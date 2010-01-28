@@ -1,4 +1,4 @@
-feedingit (0.4.2-5) unstable; urgency=low
+feedingit (0.4.3-1) unstable; urgency=low
 
   * Background save of feeds to disk
   * Added edit feed button
