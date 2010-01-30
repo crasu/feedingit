@@ -19,7 +19,7 @@
 # ============================================================================
 # Name        : FeedingIt.py
 # Author      : Yves Marcoz
-# Version     : 0.4.1
+# Version     : 0.4.3
 # Description : Simple RSS Reader
 # ============================================================================
 
@@ -29,7 +29,7 @@ import ConfigParser
 import gobject
 
 section = "FeedingIt"
-ranges = { "updateInterval":[0.02, 0.5, 1, 2, 4, 12, 24], "expiry":[24, 48, 72], "fontSize":range(12,24), "orientation":["Automatic", "Landscape", "Portrait"]}
+ranges = { "updateInterval":[0.5, 1, 2, 4, 12, 24], "expiry":[24, 48, 72], "fontSize":range(12,24), "orientation":["Automatic", "Landscape", "Portrait"]}
 titles = {"updateInterval":"Auto-update Interval", "expiry":"Expiry For Articles", "fontSize":"Font Size For Article Listing", "orientation":"Display Orientation"}
 subtitles = {"updateInterval":"Update every %s hours", "expiry":"Delete articles after %s hours", "fontSize":"%s pixels", "orientation":"%s"}
 

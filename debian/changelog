@@ -1,3 +1,13 @@
+feedingit (0.4.3-5) unstable; urgency=low
+
+  * Fix timing of autoupdate
+  * Fix specific feeds
+  * Fix display when few feeds are displayed
+  * Fix export of feeds with "&" symbols
+  * Added GetStatus dbus call to get the listing of unread items
+  
+ -- Yves <yves@marcoz.org>  Tue, 29 Jan 2010 21:47:19 -0800
+
 feedingit (0.4.3-1) unstable; urgency=low
 
   * Background save of feeds to disk

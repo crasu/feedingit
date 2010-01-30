@@ -19,7 +19,7 @@
 # ============================================================================
 # Name        : FeedingIt.py
 # Author      : Yves Marcoz
-# Version     : 0.4.1
+# Version     : 0.4.3
 # Description : Simple RSS Reader
 # ============================================================================
 
@@ -146,7 +146,7 @@ class ImageDownloader():
             
     def stopAll(self):
         self.images = []
-            
+        
         
 class Download(threading.Thread):
     def __init__(self, listing, key, config):
@@ -229,6 +229,11 @@ class SortList(gtk.Dialog):
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
         button.set_label("Move Down")
         button.connect("clicked", self.buttonDown)
+        self.vbox2.pack_start(button, expand=False, fill=False)
+
+        button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
+        button.set_label("Add Feed")
+        button.connect("clicked", self.buttonAdd)
         self.vbox2.pack_start(button, expand=False, fill=False)
 
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
@@ -337,6 +342,16 @@ class SortList(gtk.Dialog):
 
     def buttonDone(self, *args):
         self.destroy()
+        
+    def buttonAdd(self, button, urlIn="http://"):
+        wizard = AddWidgetWizard(self, urlIn)
+        ret = wizard.run()
+        if ret == 2:
+            (title, url) = wizard.getData()
+            if (not title == '') and (not url == ''): 
+               self.listing.addFeed(title, url)
+        wizard.destroy()
+        self.refreshList()
                
 
 class DisplayArticle(hildon.StackableWindow):
@@ -477,7 +492,7 @@ class DisplayFeed(hildon.StackableWindow):
     def destroyWindow(self, *args):
         self.emit("feed-closed", self.key)
         self.destroy()
-        gobject.idle_add(self.feed.saveFeed, CONFIGDIR)
+        #gobject.idle_add(self.feed.saveFeed, CONFIGDIR)
         self.listing.closeCurrentlyDisplayedFeed()
 
     def displayFeed(self):
@@ -591,8 +606,10 @@ class FeedingIt:
         self.window = hildon.StackableWindow()
         self.window.set_title("FeedingIt")
         hildon.hildon_gtk_window_set_progress_indicator(self.window, 1)
+        self.mainVbox = gtk.VBox(False,10)
         self.pannableListing = gtk.Label("Loading...")
-        self.window.add(self.pannableListing)
+        self.mainVbox.pack_start(self.pannableListing)
+        self.window.add(self.mainVbox)
         self.window.show_all()
         self.config = Config(self.window, CONFIGDIR+"config.ini")
         gobject.idle_add(self.createWindow)
@@ -612,8 +629,8 @@ class FeedingIt:
         menu.append(button)
         
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
-        button.set_label("Add Feed")
-        button.connect("clicked", self.button_add_clicked)
+        button.set_label("Mark All As Read")
+        button.connect("clicked", self.button_markAll)
         menu.append(button)
         
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
@@ -648,6 +665,13 @@ class FeedingIt:
         hildon.hildon_gtk_window_set_progress_indicator(self.window, 0)
 
 
+    def button_markAll(self, button):
+        for key in self.listing.getListOfFeeds():
+            feed = self.listing.getFeed(key)
+            for index in range(feed.getNumberOfEntries()):
+                feed.setEntryRead(index)
+        self.refreshList()
+
     def button_export_clicked(self, button):
         opml = ExportOpmlData(self.window, self.listing)
         
@@ -665,29 +689,19 @@ class FeedingIt:
         self.listing.saveConfig()
         self.displayListing()
         
-    def button_add_clicked(self, button, urlIn="http://"):
-        wizard = AddWidgetWizard(self.window, urlIn)
-        ret = wizard.run()
-        if ret == 2:
-            (title, url) = wizard.getData()
-            if (not title == '') and (not url == ''): 
-               self.listing.addFeed(title, url)
-                   
-        wizard.destroy()
-        self.displayListing()
-        
     def button_update_clicked(self, button, key):
         if not type(self.downloadDialog).__name__=="DownloadBar":
             self.downloadDialog = DownloadBar(self.window, self.listing, self.listing.getListOfFeeds(), self.config )
             self.downloadDialog.connect("download-done", self.onDownloadsDone)
-            self.vboxListing.pack_start(self.downloadDialog)
-            self.pannableListing.show_all()
+            self.mainVbox.pack_end(self.downloadDialog, expand=False, fill=False)
+            self.mainVbox.show_all()
         #self.displayListing()
 
     def onDownloadsDone(self, *widget):
         self.downloadDialog.destroy()
         self.downloadDialog = False
-        self.displayListing()
+        #self.displayListing()
+        self.refreshList()
 
     def button_preferences_clicked(self, button):
         dialog = self.config.createDialog()
@@ -706,7 +720,7 @@ class FeedingIt:
         
     def displayListing(self):
         try:
-            self.window.remove(self.pannableListing)
+            self.mainVbox.remove(self.pannableListing)
         except:
             pass
         self.vboxListing = gtk.VBox(False,10)
@@ -724,20 +738,27 @@ class FeedingIt:
                             + str(self.listing.getFeedNumberOfUnreadItems(key)) + " Unread Items")
             button.set_alignment(0,0,1,1)
             button.connect("clicked", self.buttonFeedClicked, self, self.window, key)
-            self.vboxListing.pack_end(button) #, expand=False)
+            self.vboxListing.pack_start(button, expand=False)
             self.buttons[key] = button
             
-        if type(self.downloadDialog).__name__=="DownloadBar":
-            self.vboxListing.pack_start(self.downloadDialog)
-        self.window.add(self.pannableListing)
+        #if type(self.downloadDialog).__name__=="DownloadBar":
+        #    self.vboxListing.pack_start(self.downloadDialog)
+        self.mainVbox.pack_start(self.pannableListing)
         self.window.show_all()
+
+    def refreshList(self):
+        for key in self.buttons.keys():
+            button = self.buttons[key]
+            button.set_text(self.listing.getFeedTitle(key), self.listing.getFeedUpdateTime(key) + " / " 
+                            + str(self.listing.getFeedNumberOfUnreadItems(key)) + " Unread Items")
 
     def buttonFeedClicked(widget, button, self, window, key):
         disp = DisplayFeed(self.listing, self.listing.getFeed(key), self.listing.getFeedTitle(key), key, self.config)
         disp.connect("feed-closed", self.onFeedClosed)
 
     def onFeedClosed(self, object, key):
-        self.displayListing()
+        #self.displayListing()
+        self.refreshList()
         #self.buttons[key].set_text(self.listing.getFeedTitle(key), self.listing.getFeedUpdateTime(key) + " / " 
         #                    + str(self.listing.getFeedNumberOfUnreadItems(key)) + " Unread Items")
         #self.buttons[key].show()
@@ -745,6 +766,8 @@ class FeedingIt:
     def run(self):
         self.window.connect("destroy", gtk.main_quit)
         gtk.main()
+        for key in self.listing.getListOfFeeds():
+            self.listing.getFeed(key).saveFeed(CONFIGDIR)
         self.listing.saveConfig()
 
     def prefsClosed(self, *widget):
@@ -752,12 +775,18 @@ class FeedingIt:
         self.checkAutoUpdate()
 
     def checkAutoUpdate(self, *widget):
+        interval = int(self.config.getUpdateInterval()*3600000)
         if self.config.isAutoUpdateEnabled():
-            if not self.autoupdate:
-                self.autoupdateId = gobject.timeout_add(int(self.config.getUpdateInterval()*3600000), self.automaticUpdate)
-                self.autoupdate = True
+            if self.autoupdate == False:
+                self.autoupdateId = gobject.timeout_add(interval, self.automaticUpdate)
+                self.autoupdate = interval
+            elif not self.autoupdate == interval:
+                # If auto-update is enabled, but not at the right frequency
+                gobject.source_remove(self.autoupdateId)
+                self.autoupdateId = gobject.timeout_add(interval, self.automaticUpdate)
+                self.autoupdate = interval
         else:
-            if self.autoupdate:
+            if not self.autoupdate == False:
                 gobject.source_remove(self.autoupdateId)
                 self.autoupdate = False
 
@@ -767,6 +796,15 @@ class FeedingIt:
         # gobject.timeout_add(int(5*3600000), self.automaticUpdate)
         self.button_update_clicked(None, None)
         return True
+    
+    def getStatus(self):
+        status = ""
+        for key in self.listing.getListOfFeeds():
+            if self.listing.getFeedNumberOfUnreadItems(key) > 0:
+                status += self.listing.getFeedTitle(key) + ": \t" +  str(self.listing.getFeedNumberOfUnreadItems(key)) + " Unread Items\n"
+        if status == "":
+            status = "No unread items"
+        return status
 
 if __name__ == "__main__":
     gobject.signal_new("feed-closed", DisplayFeed, gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,))

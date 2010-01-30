@@ -19,7 +19,7 @@
 # ============================================================================
 # Name        : FeedingIt.py
 # Author      : Yves Marcoz
-# Version     : 0.4.1
+# Version     : 0.4.3
 # Description : Simple RSS Reader
 # ============================================================================
 
@@ -143,11 +143,13 @@ class Feed:
             return []
     
     def getContent(self, index):
+        content = ""
         entry = self.entries[index]
-        if entry.has_key('content'):
-            content = entry.content[0].value
-        elif entry.has_key('summary'):
+        if entry.has_key('summary'):
             content = entry.get('summary', '')
+        if entry.has_key('content'):
+            if len(entry.content[0].value) > len(content):
+                content = entry.content[0].value
         else:
             content = entry.get('description', '')
         return content

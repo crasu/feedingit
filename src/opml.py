@@ -50,9 +50,9 @@ class ExportOpmlData():
         response = dialog.run()
         dialog.hide()
         if response == gtk.RESPONSE_OK:
-            filename = dialog.get_filename()
-            print filename
-            try:
+                filename = dialog.get_filename()
+                print filename
+            #try:
 
                 cont = True
                 if isfile(filename):
@@ -71,13 +71,13 @@ class ExportOpmlData():
                     file.write(self.getOpmlText(listing))
                     file.close()
                     note = "Feeds exported to %s" %filename
-            except:
+            #except:
                 note = "Failed to export feeds"
             
-            dialog.destroy()
-            dialog = hildon.Note ("information", parent, note , gtk.STOCK_DIALOG_INFO )
-            dialog.run()
-            dialog.destroy()
+            #dialog.destroy()
+            #dialog = hildon.Note ("information", parent, note , gtk.STOCK_DIALOG_INFO )
+            #dialog.run()
+            #dialog.destroy()
         elif response == gtk.RESPONSE_CANCEL:
             dialog.destroy()  
 
@@ -94,9 +94,13 @@ class ExportOpmlData():
             title = listing.getFeedTitle(key)
             url = listing.getFeedUrl(key)
             if not title == "Archived Articles": 
-                opml_text += """\n\t\t<outline  type="rss" text="%s" title="%s" xmlUrl="%s"/>""" % (title, title, url)
+                opml_text += """\n\t\t<outline  type="rss" text="%s" title="%s" xmlUrl="%s"/>""" % (self.sanitize(title), self.sanitize(title), self.sanitize(url))
         opml_text += """\n</body>\n</opml>\n"""
         return opml_text
+    
+    def sanitize(self, text):
+        return text.encode('ascii', 'xmlcharrefreplace')
+        
         
 
 class GetOpmlData():

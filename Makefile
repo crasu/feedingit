@@ -25,3 +25,9 @@ install:
 	install data/64px.png ${DESTDIR}/usr/share/icons/hicolor/64x64/apps/feedingit.png
 	install -d ${DESTDIR}/usr/share/dbus-1/services/
 	install src/feedingit.service ${DESTDIR}/usr/share/dbus-1/services/
+	
+clean:
+	rm src/*pyo
+	
+sourcepkg:
+	dpkg-buildpackage -rfakeroot -sa -S -i -I.git
