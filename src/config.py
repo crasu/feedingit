@@ -29,9 +29,9 @@ import ConfigParser
 import gobject
 
 section = "FeedingIt"
-ranges = { "updateInterval":[0.5, 1, 2, 4, 12, 24], "expiry":[24, 48, 72], "fontSize":range(12,24), "orientation":["Automatic", "Landscape", "Portrait"]}
-titles = {"updateInterval":"Auto-update Interval", "expiry":"Expiry For Articles", "fontSize":"Font Size For Article Listing", "orientation":"Display Orientation"}
-subtitles = {"updateInterval":"Update every %s hours", "expiry":"Delete articles after %s hours", "fontSize":"%s pixels", "orientation":"%s"}
+ranges = { "updateInterval":[0.5, 1, 2, 4, 12, 24], "expiry":[24, 48, 72], "fontSize":range(12,24), "orientation":["Automatic", "Landscape", "Portrait"], "artFontSize":[10, 12, 14, 16, 18, 20]}
+titles = {"updateInterval":"Auto-update Interval", "expiry":"Expiry For Articles", "fontSize":"Font Size For Article Listing", "orientation":"Display Orientation", "artFontSize":"Font Size For Articles"}
+subtitles = {"updateInterval":"Update every %s hours", "expiry":"Delete articles after %s hours", "fontSize":"%s pixels", "orientation":"%s", "artFontSize":"%s pixels"}
 
 class Config():
     def __init__(self, parent, configFilename):
@@ -43,9 +43,12 @@ class Config():
     def createDialog(self):
         
         self.window = gtk.Dialog("Preferences", self.parent)
-        #self.vbox = gtk.VBox(False, 10)
+        self.window.set_default_size(-1, 600)
+        panArea = hildon.PannableArea()
+        
+        vbox = gtk.VBox(False, 10)
         self.buttons = {}
-        for setting in ["fontSize", "expiry", "orientation", "updateInterval",]:
+        for setting in ["fontSize", "artFontSize", "expiry", "orientation", "updateInterval",]:
             picker = hildon.PickerButton(gtk.HILDON_SIZE_FINGER_HEIGHT, hildon.BUTTON_ARRANGEMENT_VERTICAL)
             selector = self.create_selector(ranges[setting], setting)
             picker.set_selector(selector)
@@ -54,15 +57,17 @@ class Config():
             picker.set_name('HildonButton-finger')
             picker.set_alignment(0,0,1,1)
             self.buttons[setting] = picker
-            self.window.vbox.pack_start(picker)
+            vbox.pack_start(picker)
         
         button = hildon.CheckButton(gtk.HILDON_SIZE_FINGER_HEIGHT)
         button.set_label("Auto-update Enabled")
         button.set_active(self.config["autoupdate"])
         button.connect("toggled", self.button_toggled)
         
-        self.window.vbox.pack_start(button)
+        vbox.pack_start(button)
+        panArea.add_with_viewport(vbox)
         
+        self.window.vbox.add(panArea)        
         self.window.connect("destroy", self.onExit)
         #self.window.add(self.vbox)
         self.window.show_all()
@@ -97,12 +102,14 @@ class Config():
             configParser = ConfigParser.RawConfigParser()
             configParser.read(self.configFilename)
             self.config["fontSize"] = configParser.getint(section, "fontSize")
+            self.config["artFontSize"] = configParser.getint(section, "artFontSize")
             self.config["expiry"] = configParser.getint(section, "expiry")
             self.config["autoupdate"] = configParser.getboolean(section, "autoupdate")
             self.config["updateInterval"] = configParser.getfloat(section, "updateInterval")
             self.config["orientation"] = configParser.get(section, "orientation")
         except:
             self.config["fontSize"] = 16
+            self.config["artFontSize"] = 18
             self.config["expiry"] = 24
             self.config["autoupdate"] = False
             self.config["updateInterval"] = 4
@@ -112,6 +119,7 @@ class Config():
         configParser = ConfigParser.RawConfigParser()
         configParser.add_section(section)
         configParser.set(section, 'fontSize', str(self.config["fontSize"]))
+        configParser.set(section, 'artFontSize', str(self.config["artFontSize"]))
         configParser.set(section, 'expiry', str(self.config["expiry"]))
         configParser.set(section, 'autoupdate', str(self.config["autoupdate"]))
         configParser.set(section, 'updateInterval', str(self.config["updateInterval"]))
@@ -138,6 +146,8 @@ class Config():
 
     def getFontSize(self):
         return self.config["fontSize"]
+    def getArtFontSize(self):
+        return self.config["artFontSize"]
     def getExpiry(self):
         return self.config["expiry"]
     def isAutoUpdateEnabled(self):

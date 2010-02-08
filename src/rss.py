@@ -95,6 +95,11 @@ class Feed:
         if self.readItems[self.getUniqueId(index)]==False:
             self.countUnread = self.countUnread - 1
             self.readItems[self.getUniqueId(index)] = True
+            
+    def setEntryUnread(self, index):
+        if self.readItems[self.getUniqueId(index)]==True:
+            self.countUnread = self.countUnread + 1
+            self.readItems[self.getUniqueId(index)] = False
     
     def isEntryRead(self, index):
         return self.readItems[self.getUniqueId(index)]
@@ -150,7 +155,7 @@ class Feed:
         if entry.has_key('content'):
             if len(entry.content[0].value) > len(content):
                 content = entry.content[0].value
-        else:
+        if content == "":
             content = entry.get('description', '')
         return content
     
@@ -170,11 +175,13 @@ class Feed:
             date = ""
         #text = '''<div style="color: black; background-color: white;">'''
         text = '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>'
-        text += '<div><a href=\"' + link + '\">' + title + "</a>"
+        text += '<head><style> body {-webkit-user-select: none;} </style></head>'
+        text += '<body><div><a href=\"' + link + '\">' + title + "</a>"
         text += "<BR /><small><i>Date: " + date + "</i></small></div>"
         text += "<BR /><BR />"
         text += content
-        return text    
+        text += "</body>"
+        return text
 
 class ArchivedArticles(Feed):
     def addArchivedArticle(self, title, link, updated_parsed, configdir):
@@ -192,6 +199,7 @@ class ArchivedArticles(Feed):
         #print entry
         
     def updateFeed(self, configdir, expiryTime=24):
+        index = 0
         for entry in self.getEntries():
             if not entry["downloaded"]:
                 try:
@@ -201,12 +209,14 @@ class ArchivedArticles(Feed):
                     if len(entry["summary"]) > 0:
                         entry["downloaded"] = True
                         entry["time"] = time.time()
+                        self.setEntryUnread(index)
                 except:
                     pass
             currentTime = time.time()
             expiry = float(expiryTime) * 3600
             if currentTime - entry["time"] > expiry:
                 self.entries.remove(entry)
+            index += 1
         self.updateTime = time.asctime()
         self.saveFeed(configdir)
 
@@ -236,11 +246,19 @@ class Listing:
             if "font" in self.sortedKeys:
                 self.sortedKeys.remove("font")
             self.sortedKeys.sort(key=lambda obj: self.getFeedTitle(obj))
-        for key in self.sortedKeys:
+        list = self.sortedKeys[:]
+        for key in list:
             try:
                 self.loadFeed(key)
             except:
+                #import traceback
+                #if key.startswith('d8'):
+                #traceback.print_exc()
                 self.sortedKeys.remove(key)
+            #print key
+                #print key in self.sortedKeys
+        #print "d8eb3f07572892a7b5ed9c81c5bb21a2" in self.sortedKeys
+        #print self.listOfFeeds["d8eb3f07572892a7b5ed9c81c5bb21a2"]
         self.closeCurrentlyDisplayedFeed()
         #self.saveConfig()
 
@@ -262,6 +280,7 @@ class Listing:
                 self.feeds[key] = pickle.load(file)
                 file.close()
             else:
+                #print key
                 title = self.listOfFeeds[key]["title"]
                 url = self.listOfFeeds[key]["url"]
                 self.feeds[key] = Feed(title, url)
@@ -282,6 +301,7 @@ class Listing:
         return self.feeds[key]
     
     def getFeedUpdateTime(self, key):
+        #print self.listOfFeeds.has_key(key)
         return self.feeds[key].getUpdateTime()
     
     def getFeedNumberOfUnreadItems(self, key):
@@ -312,6 +332,7 @@ class Listing:
         del self.feeds[key]
         if isfile(self.configdir+key):
            remove(self.configdir+key)
+        self.saveConfig()
     
     def saveConfig(self):
         self.listOfFeeds["feedingit-order"] = self.sortedKeys
@@ -336,3 +357,11 @@ class Listing:
         self.currentlyDisplayedFeed = False
     def getCurrentlyDisplayedFeed(self):
         return self.currentlyDisplayedFeed
+    
+if __name__ == "__main__":
+    listing = Listing('/home/user/.feedingit/')
+    list = listing.getListOfFeeds()[:]
+        #list.reverse()
+    for key in list:
+        if key.startswith('d8'):
+            print listing.getFeedUpdateTime(key)

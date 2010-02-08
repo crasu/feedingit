@@ -25,6 +25,8 @@ install:
 	install data/64px.png ${DESTDIR}/usr/share/icons/hicolor/64x64/apps/feedingit.png
 	install -d ${DESTDIR}/usr/share/dbus-1/services/
 	install src/feedingit.service ${DESTDIR}/usr/share/dbus-1/services/
+	install -d ${DESTDIR}/etc/osso-backup/applications
+	install src/feedingit.conf /etc/osso-backup/applications/
 	
 clean:
 	rm src/*pyo

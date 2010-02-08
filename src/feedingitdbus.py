@@ -37,7 +37,7 @@ class ServerObject(dbus.service.Object):
     # Here the interface name, and the method is named same as on dbus.
     @dbus.service.method('org.maemo.feedingit')
     def AddFeed(self, url):
-        self.app.button_add_clicked(None, url)
+        self.app.addFeed(None, url)
         return "Done"
     
     @dbus.service.method('org.maemo.feedingit')

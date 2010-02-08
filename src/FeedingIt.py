@@ -27,7 +27,13 @@ import gtk
 import feedparser
 import pango
 import hildon
-import gtkhtml2
+#import gtkhtml2
+try:
+    import webkit
+    has_webkit=True
+except:
+    import gtkhtml2
+    has_webkit=False
 import time
 import dbus
 import pickle
@@ -160,13 +166,14 @@ class Download(threading.Thread):
 
         
 class DownloadBar(gtk.ProgressBar):
-    def __init__(self, parent, listing, listOfKeys, config):
+    def __init__(self, parent, listing, listOfKeys, config, single=False):
         gtk.ProgressBar.__init__(self)
         self.listOfKeys = listOfKeys[:]
         self.listing = listing
         self.total = len(self.listOfKeys)
         self.config = config
         self.current = 0
+        self.single = single
         
         if self.total>0:
             #self.progress = gtk.ProgressBar()
@@ -199,7 +206,7 @@ class DownloadBar(gtk.ProgressBar):
             if len(self.listOfKeys)>0:
                 self.current = self.current+1
                 key = self.listOfKeys.pop()
-                if not self.listing.getCurrentlyDisplayedFeed() == key:
+                if (not self.listing.getCurrentlyDisplayedFeed() == key) or (self.single == True):
                     # Check if the feed is being displayed
                     download = Download(self.listing, key, self.config)
                     download.start()
@@ -355,7 +362,7 @@ class SortList(gtk.Dialog):
                
 
 class DisplayArticle(hildon.StackableWindow):
-    def __init__(self, title, text, link, index, key, listing):
+    def __init__(self, title, text, link, index, key, listing, config):
         hildon.StackableWindow.__init__(self)
         self.imageDownloader = ImageDownloader()
         self.listing=listing
@@ -364,25 +371,35 @@ class DisplayArticle(hildon.StackableWindow):
         self.text = text
         self.link = link
         self.set_title(title)
+        self.config = config
         self.images = []
         
-        # Init the article display    
-        self.view = gtkhtml2.View()
+        # Init the article display
+        if has_webkit:
+            self.view = webkit.WebView()
+            #self.view.set_editable(False)
+        else:
+            self.view = gtkhtml2.View()
+            self.document = gtkhtml2.Document()
+            self.view.set_document(self.document)
+            self.document.connect("link_clicked", self._signal_link_clicked)
         self.pannable_article = hildon.PannableArea()
         self.pannable_article.add(self.view)
         #self.pannable_article.set_property("mov-mode", hildon.MOVEMENT_MODE_BOTH)
-        self.gestureId = self.pannable_article.connect('horizontal-movement', self.gesture)
-        self.document = gtkhtml2.Document()
-        self.view.set_document(self.document)
-        
-        self.document.connect("link_clicked", self._signal_link_clicked)
-        if not key == "1295627ef630df9d239abeb0ba631c3f":
-            # Do not download images if the feed is "Archived Articles"
-            self.document.connect("request-url", self._signal_request_url)
-        self.document.clear()
-        self.document.open_stream("text/html")
-        self.document.write_stream(self.text)
-        self.document.close_stream()
+        #self.gestureId = self.pannable_article.connect('horizontal-movement', self.gesture)
+
+        if has_webkit:
+            self.view.load_string(self.text, "text/html", "utf-8", self.link)
+            self.view.set_zoom_level(float(config.getArtFontSize())/10.)
+        else:
+            if not key == "1295627ef630df9d239abeb0ba631c3f":
+                # Do not download images if the feed is "Archived Articles"
+                self.document.connect("request-url", self._signal_request_url)
+            
+            self.document.clear()
+            self.document.open_stream("text/html")
+            self.document.write_stream(self.text)
+            self.document.close_stream()
         
         menu = hildon.AppMenu()
         # Create a button and add it to the menu
@@ -404,18 +421,41 @@ class DisplayArticle(hildon.StackableWindow):
         self.set_app_menu(menu)
         menu.show_all()
         
+        #self.event_box = gtk.EventBox()
+        #self.event_box.add(self.pannable_article)
         self.add(self.pannable_article)
+        
         
         self.pannable_article.show_all()
 
         self.destroyId = self.connect("destroy", self.destroyWindow)
+        
+        self.view.connect("button_press_event", self.button_pressed)
+        self.view.connect("button_release_event", self.button_released)
         #self.timeout_handler_id = gobject.timeout_add(300, self.reloadArticle)
 
-    def gesture(self, widget, direction, startx, starty):
-        if (direction == 3):
-            self.emit("article-next", self.index)
-        if (direction == 2):
-            self.emit("article-previous", self.index)
+    def button_pressed(self, window, event):
+        #print event.x, event.y
+        self.coords = (event.x, event.y)
+        
+    def button_released(self, window, event):
+        x = self.coords[0] - event.x
+        y = self.coords[1] - event.y
+        
+        if (abs(y) < 20):
+            if (x > 30):
+                self.emit("article-previous", self.index)
+            elif (x<-30):
+                self.emit("article-next", self.index)   
+        #print x, y
+        #print "Released"
+
+    #def gesture(self, widget, direction, startx, starty):
+    #    if (direction == 3):
+    #        self.emit("article-next", self.index)
+    #    if (direction == 2):
+    #        self.emit("article-previous", self.index)
+        #print startx, starty
         #self.timeout_handler_id = gobject.timeout_add(200, self.destroyWindow)
 
     def destroyWindow(self, *args):
@@ -448,7 +488,7 @@ class DisplayArticle(hildon.StackableWindow):
         bus = dbus.SystemBus()
         proxy = bus.get_object("com.nokia.osso_browser", "/com/nokia/osso_browser/request")
         iface = dbus.Interface(proxy, 'com.nokia.osso_browser')
-        iface.open_new_window(link)
+        iface.load_url(link)
 
     def _signal_request_url(self, object, url, stream):
         #print url
@@ -468,15 +508,17 @@ class DisplayFeed(hildon.StackableWindow):
         self.key=key
         self.config = config
         
+        self.downloadDialog = False
+        
         self.listing.setCurrentlyDisplayedFeed(self.key)
         
         self.disp = False
         
         menu = hildon.AppMenu()
-        #button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
-        #button.set_label("Update Feed")
-        #button.connect("clicked", self.button_update_clicked)
-        #menu.append(button)
+        button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
+        button.set_label("Update Feed")
+        button.connect("clicked", self.button_update_clicked)
+        menu.append(button)
         
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
         button.set_label("Mark All As Read")
@@ -529,7 +571,7 @@ class DisplayFeed(hildon.StackableWindow):
         self.remove(self.pannableFeed)
 
     def button_clicked(self, button, index, previous=False, next=False):
-        newDisp = DisplayArticle(self.feedTitle, self.feed.getArticle(index), self.feed.getLink(index), index, self.key, self.listing)
+        newDisp = DisplayArticle(self.feedTitle, self.feed.getArticle(index), self.feed.getLink(index), index, self.key, self.listing, self.config)
         stack = hildon.WindowStack.get_default()
         if previous:
             tmp = stack.peek()
@@ -586,8 +628,20 @@ class DisplayFeed(hildon.StackableWindow):
         label.modify_font(pango.FontDescription(self.config.getReadFont()))
         self.buttons[index].show()
 
-    #def button_update_clicked(self, button):
-    #    bar = DownloadBar(self, self.listing, [self.key,], self.config )       
+    def button_update_clicked(self, button):
+        #bar = DownloadBar(self, self.listing, [self.key,], self.config ) 
+        if not type(self.downloadDialog).__name__=="DownloadBar":
+            self.pannableFeed.destroy()
+            self.vbox = gtk.VBox(False, 10)
+            self.downloadDialog = DownloadBar(self.window, self.listing, [self.key,], self.config, single=True )
+            self.downloadDialog.connect("download-done", self.onDownloadsDone)
+            self.vbox.pack_start(self.downloadDialog, expand=False, fill=False)
+            self.add(self.vbox)
+            self.show_all()
+            
+    def onDownloadsDone(self, *widget):
+        self.vbox.destroy()
+        self.displayFeed()
         #self.feed.updateFeed()
     #    self.clear()
     #    self.displayFeed()
@@ -618,8 +672,8 @@ class FeedingIt:
         self.listing = Listing(CONFIGDIR)
         
         self.downloadDialog = False
-        self.orientation = FremantleRotation("FeedingIt", main_window=self.window)
-        self.orientation.set_mode(self.config.getOrientation())
+        #self.orientation = FremantleRotation("FeedingIt", main_window=self.window)
+        #self.orientation.set_mode(self.config.getOrientation())
         
         menu = hildon.AppMenu()
         # Create a button and add it to the menu
@@ -664,7 +718,6 @@ class FeedingIt:
         self.checkAutoUpdate()
         hildon.hildon_gtk_window_set_progress_indicator(self.window, 0)
 
-
     def button_markAll(self, button):
         for key in self.listing.getListOfFeeds():
             feed = self.listing.getFeed(key)
@@ -680,6 +733,16 @@ class FeedingIt:
         feeds = opml.getData()
         for (title, url) in feeds:
             self.listing.addFeed(title, url)
+        self.displayListing()
+
+    def addFeed(self, urlIn="http://"):
+        wizard = AddWidgetWizard(self.window, urlIn)
+        ret = wizard.run()
+        if ret == 2:
+            (title, url) = wizard.getData()
+            if (not title == '') and (not url == ''): 
+               self.listing.addFeed(title, url)
+        wizard.destroy()
         self.displayListing()
 
     def button_organize_clicked(self, button):
@@ -729,7 +792,7 @@ class FeedingIt:
 
         self.buttons = {}
         list = self.listing.getListOfFeeds()[:]
-        list.reverse()
+        #list.reverse()
         for key in list:
             #button = gtk.Button(item)
             button = hildon.Button(gtk.HILDON_SIZE_AUTO_WIDTH | gtk.HILDON_SIZE_FINGER_HEIGHT,
@@ -747,10 +810,14 @@ class FeedingIt:
         self.window.show_all()
 
     def refreshList(self):
-        for key in self.buttons.keys():
-            button = self.buttons[key]
-            button.set_text(self.listing.getFeedTitle(key), self.listing.getFeedUpdateTime(key) + " / " 
+        for key in self.listing.getListOfFeeds():
+            if self.buttons.has_key(key):
+                button = self.buttons[key]
+                button.set_text(self.listing.getFeedTitle(key), self.listing.getFeedUpdateTime(key) + " / " 
                             + str(self.listing.getFeedNumberOfUnreadItems(key)) + " Unread Items")
+            else:
+                self.displayListing()
+                break
 
     def buttonFeedClicked(widget, button, self, window, key):
         disp = DisplayFeed(self.listing, self.listing.getFeed(key), self.listing.getFeedTitle(key), key, self.config)
