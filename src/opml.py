@@ -99,7 +99,8 @@ class ExportOpmlData():
         return opml_text
     
     def sanitize(self, text):
-        return text.encode('ascii', 'xmlcharrefreplace')
+	from cgi import escape
+        return escape(text).encode('ascii', 'xmlcharrefreplace')
         
         
 
