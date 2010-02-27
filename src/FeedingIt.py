@@ -19,7 +19,7 @@
 # ============================================================================
 # Name        : FeedingIt.py
 # Author      : Yves Marcoz
-# Version     : 0.4.3
+# Version     : 0.5.0
 # Description : Simple RSS Reader
 # ============================================================================
 
@@ -179,7 +179,7 @@ class DownloadBar(gtk.ProgressBar):
             #self.progress = gtk.ProgressBar()
             #self.waitingWindow = hildon.Note("cancel", parent, "Downloading",
             #                     progressbar=self.progress)
-            self.set_text("Downloading")
+            self.set_text("Updating...")
             self.fraction = 0
             self.set_fraction(self.fraction)
             self.show_all()
@@ -375,7 +375,7 @@ class DisplayArticle(hildon.StackableWindow):
         self.images = []
         
         # Init the article display
-        if has_webkit:
+        if self.config.getWebkitSupport():
             self.view = webkit.WebView()
             #self.view.set_editable(False)
         else:
@@ -388,7 +388,7 @@ class DisplayArticle(hildon.StackableWindow):
         #self.pannable_article.set_property("mov-mode", hildon.MOVEMENT_MODE_BOTH)
         #self.gestureId = self.pannable_article.connect('horizontal-movement', self.gesture)
 
-        if has_webkit:
+        if self.config.getWebkitSupport():
             self.view.load_string(self.text, "text/html", "utf-8", self.link)
             self.view.set_zoom_level(float(config.getArtFontSize())/10.)
         else:
@@ -665,15 +665,15 @@ class FeedingIt:
         self.mainVbox.pack_start(self.pannableListing)
         self.window.add(self.mainVbox)
         self.window.show_all()
-        self.config = Config(self.window, CONFIGDIR+"config.ini")
+        self.config = Config(self.window, CONFIGDIR+"config.ini", has_webkit)
         gobject.idle_add(self.createWindow)
         
     def createWindow(self):
         self.listing = Listing(CONFIGDIR)
         
         self.downloadDialog = False
-        #self.orientation = FremantleRotation("FeedingIt", main_window=self.window)
-        #self.orientation.set_mode(self.config.getOrientation())
+        self.orientation = FremantleRotation("FeedingIt", main_window=self.window)
+        self.orientation.set_mode(self.config.getOrientation())
         
         menu = hildon.AppMenu()
         # Create a button and add it to the menu

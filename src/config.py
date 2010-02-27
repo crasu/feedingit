@@ -34,9 +34,10 @@ titles = {"updateInterval":"Auto-update Interval", "expiry":"Expiry For Articles
 subtitles = {"updateInterval":"Update every %s hours", "expiry":"Delete articles after %s hours", "fontSize":"%s pixels", "orientation":"%s", "artFontSize":"%s pixels"}
 
 class Config():
-    def __init__(self, parent, configFilename):
+    def __init__(self, parent, configFilename, has_webkit):
         self.configFilename = configFilename
         self.parent = parent
+        self.has_webkit = has_webkit
         # Load config
         self.loadConfig()
         
@@ -48,7 +49,11 @@ class Config():
         
         vbox = gtk.VBox(False, 10)
         self.buttons = {}
-        for setting in ["fontSize", "artFontSize", "expiry", "orientation", "updateInterval",]:
+        if self.has_webkit:
+            settings = ["fontSize", "artFontSize", "expiry", "orientation", "updateInterval",]
+        else:
+            settings = ["fontSize", "expiry", "orientation", "updateInterval",]
+        for setting in settings:
             picker = hildon.PickerButton(gtk.HILDON_SIZE_FINGER_HEIGHT, hildon.BUTTON_ARRANGEMENT_VERTICAL)
             selector = self.create_selector(ranges[setting], setting)
             picker.set_selector(selector)
@@ -62,9 +67,16 @@ class Config():
         button = hildon.CheckButton(gtk.HILDON_SIZE_FINGER_HEIGHT)
         button.set_label("Auto-update Enabled")
         button.set_active(self.config["autoupdate"])
-        button.connect("toggled", self.button_toggled)
-        
+        button.connect("toggled", self.button_toggled, "autoupdate")
         vbox.pack_start(button)
+
+        if self.has_webkit:
+            button = hildon.CheckButton(gtk.HILDON_SIZE_FINGER_HEIGHT)
+            button.set_label("Webkit Articles Enabled")
+            button.set_active(self.config["webkit"])
+            button.connect("toggled", self.button_toggled, "webkit")
+            vbox.pack_start(button)
+        
         panArea.add_with_viewport(vbox)
         
         self.window.vbox.add(panArea)        
@@ -77,12 +89,12 @@ class Config():
         self.saveConfig()
         self.window.destroy()
 
-    def button_toggled(self, widget):
+    def button_toggled(self, widget, configName):
         #print "widget", widget.get_active()
         if (widget.get_active()):
-            self.config["autoupdate"] = True
+            self.config[configName] = True
         else:
-            self.config["autoupdate"] = False
+            self.config[configName] = False
         #print "autoup",  self.autoupdate
         self.saveConfig()
         
@@ -107,13 +119,15 @@ class Config():
             self.config["autoupdate"] = configParser.getboolean(section, "autoupdate")
             self.config["updateInterval"] = configParser.getfloat(section, "updateInterval")
             self.config["orientation"] = configParser.get(section, "orientation")
+            self.config["webkit"] = configParser.getboolean(section, "webkit")
         except:
-            self.config["fontSize"] = 16
-            self.config["artFontSize"] = 18
+            self.config["fontSize"] = 17
+            self.config["artFontSize"] = 14
             self.config["expiry"] = 24
             self.config["autoupdate"] = False
             self.config["updateInterval"] = 4
             self.config["orientation"] = "Automatic"
+            self.config["webkit"] = self.has_webkit
         
     def saveConfig(self):
         configParser = ConfigParser.RawConfigParser()
@@ -124,6 +138,7 @@ class Config():
         configParser.set(section, 'autoupdate', str(self.config["autoupdate"]))
         configParser.set(section, 'updateInterval', str(self.config["updateInterval"]))
         configParser.set(section, 'orientation', str(self.config["orientation"]))
+        configParser.set(section, 'webkit', str(self.config["webkit"]))
 
         # Writing our configuration file
         file = open(self.configFilename, 'wb')
@@ -160,3 +175,8 @@ class Config():
         return "sans bold %s" % self.config["fontSize"]
     def getOrientation(self):
         return ranges["orientation"].index(self.config["orientation"])
+    def getWebkitSupport(self):
+        if self.has_webkit:
+            return self.config["webkit"]
+        else:
+            return False

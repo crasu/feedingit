@@ -19,7 +19,7 @@
 # ============================================================================
 # Name        : FeedingIt.py
 # Author      : Yves Marcoz
-# Version     : 0.4.3
+# Version     : 0.5.0
 # Description : Simple RSS Reader
 # ============================================================================
 
@@ -174,13 +174,15 @@ class Feed:
         else:
             date = ""
         #text = '''<div style="color: black; background-color: white;">'''
-        text = '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>'
-        text += '<head><style> body {-webkit-user-select: none;} </style></head>'
+        text = '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">'
+        text += "<html><head><title>" + title + "</title>"
+        text += '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>\n'
+        text += '<style> body {-webkit-user-select: none;} </style></head>'
         text += '<body><div><a href=\"' + link + '\">' + title + "</a>"
         text += "<BR /><small><i>Date: " + date + "</i></small></div>"
         text += "<BR /><BR />"
         text += content
-        text += "</body>"
+        text += "</body></html>"
         return text
 
 class ArchivedArticles(Feed):

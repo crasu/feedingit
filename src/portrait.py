@@ -23,6 +23,8 @@ import dbus.glib
 import hildon
 import osso
 
+import gconf
+
 
 class FremantleRotation(object):
     """thp's screen rotation for Maemo 5
@@ -169,10 +171,10 @@ class FremantleRotation(object):
 
         self._orientation = orientation
 
-    def _on_orientation_signal(self, orientation, stand, face, x, y, z):
+    def _on_orientation_signal(self, orientation, stand, face, x, y, z):            
         if orientation in (self._PORTRAIT, self._LANDSCAPE):
-            if self._mode == self.AUTOMATIC:
-                # Automatically set the rotation based on hardware orientation
+            if (self._mode == self.AUTOMATIC) and (not gconf.client_get_default().get_bool('/system/osso/af/slide-open')):
+                # Automatically set the rotation based on hardware orientation, if the keyboard is not open
                 self._orientation_changed(orientation)
             else:
                 # Ignore orientation changes for non-automatic modes, but save

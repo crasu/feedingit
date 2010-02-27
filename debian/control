@@ -9,9 +9,10 @@ XSBC-Bugtracker: https://garage.maemo.org/tracker/?func=browse&group_id=1202&ati
 
 Package: feedingit
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, python-gtkhtml2, python, python-hildon, libgtkhtml2-0, python-dbus, python-osso
-Description: Simple RSS Reader
- Simple RSS Reader
+Depends: ${shlibs:Depends}, ${misc:Depends}, python-gtkhtml2, python, python-hildon,
+ libgtkhtml2-0, python-dbus, python-osso, python-gconf
+Description:
+ RSS Reader
  Its main features are:
  - Portrait mode support
  - Auto-update

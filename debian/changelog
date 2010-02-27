@@ -1,9 +1,10 @@
-feedingit (0.4.5-1) unstable; urgency=low
+feedingit (0.4.5-3) unstable; urgency=low
 
   * Fixed utf-8 support
   * Fixed dbus add feed dialog
   * Re-added single feed update
   * Open in external browser now uses load_url dbus call
+  * Disabled rotation if keyboard is open
   
  -- Yves <yves@marcoz.org>  Sun, 31 Jan 2010 10:43:19 -0800
 
