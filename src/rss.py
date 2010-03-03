@@ -37,7 +37,156 @@ import urllib2
 def getId(string):
     return md5.new(string).hexdigest()
 
+class Entry:
+    def __init__(self, title, content, date, link):
+        self.title = title
+        self.content = content
+        self.date = date
+        self.link = link
+        
+# Entry = {"title":XXX, "content":XXX, "date":XXX, "link":XXX, images = [] }
+
 class Feed:
+    def __init__(self, name, url):
+        self.titles = []
+        self.entries = []
+        self.readItems = {}
+        self.name = name
+        self.url = url
+        self.updateTime = "Never"
+
+    def editFeed(self, url):
+        self.url = url
+
+    def saveFeed(self, configdir):
+
+    def updateFeed(self, configdir, expiryTime=24):
+        # Expiry time is in hours
+        tmp=feedparser.parse(self.url)
+        # Check if the parse was succesful (number of entries > 0, else do nothing)
+        if len(tmp["entries"])>0:
+           #reversedEntries = self.getEntries()
+           #reversedEntries.reverse()
+           tmpIds = []
+           for entry in tmp["entries"]:
+               tmpEntry = {"title":entry["title"], "content":self.extractContent(entry),
+                            "date":self.extractDate(entry), "link":entry["link"], images = [] }
+               
+               tmpIds.append(self.getUniqueId(-1, entry))
+           for entry in self.getEntries():
+               currentTime = time.time()
+               expiry = float(expiryTime) * 3600.
+               if entry.has_key("updated_parsed"):
+                   articleTime = time.mktime(entry["updated_parsed"])
+                   if currentTime - articleTime < expiry:
+                       id = self.getUniqueId(-1, entry)
+                       if not id in tmpIds:
+                           tmp["entries"].append(entry)
+                   
+           self.entries = tmp["entries"]
+           self.countUnread = 0
+           # Initialize the new articles to unread
+           tmpReadItems = self.readItems
+           self.readItems = {}
+           for index in range(self.getNumberOfEntries()):
+               if not tmpReadItems.has_key(self.getUniqueId(index)):
+                   self.readItems[self.getUniqueId(index)] = False
+               else:
+                   self.readItems[self.getUniqueId(index)] = tmpReadItems[self.getUniqueId(index)]
+               if self.readItems[self.getUniqueId(index)]==False:
+                  self.countUnread = self.countUnread + 1
+           del tmp
+           self.updateTime = time.asctime()
+           self.saveFeed(configdir)
+
+    def extractContent(self, entry):
+        if entry.has_key('summary'):
+            content = entry.get('summary', '')
+        if entry.has_key('content'):
+            if len(entry.content[0].value) > len(content):
+                content = entry.content[0].value
+        if content == "":
+            content = entry.get('description', '')
+        return content
+        
+    def extractDate(self, entry):
+        if entry.has_key("updated_parsed"):
+            date = time.strftime("%a, %d %b %Y %H:%M:%S",entry["updated_parsed"])
+        elif entry.has_key("published_parsed"):
+            date = time.strftime("%a, %d %b %Y %H:%M:%S", entry["published_parsed"])
+        else:
+            date = ""
+        return date
+
+    def setEntryRead(self, index):
+        if self.readItems[self.getUniqueId(index)]==False:
+            self.countUnread = self.countUnread - 1
+            self.readItems[self.getUniqueId(index)] = True
+            
+    def setEntryUnread(self, index):
+        if self.readItems[self.getUniqueId(index)]==True:
+            self.countUnread = self.countUnread + 1
+            self.readItems[self.getUniqueId(index)] = False
+    
+    def isEntryRead(self, index):
+        return self.readItems[self.getUniqueId(index)]
+    
+    def getTitle(self, index):
+        return self.entries[index]["title"]
+    
+    def getLink(self, index):
+        return self.entries[index]["link"]
+    
+    def getDate(self, index):
+ 
+    def getUniqueId(self, index, entry=None):
+        if index >=0:
+            entry = self.entries[index]
+        if entry.has_key("updated_parsed"):
+            return getId(time.strftime("%a, %d %b %Y %H:%M:%S",entry["updated_parsed"]) + entry["title"])
+        elif entry.has_key("link"):
+            return getId(entry["link"] + entry["title"])
+        else:
+            return getId(entry["title"])
+    
+    def getUpdateTime(self):
+        return self.updateTime
+    
+    def getEntries(self):
+        try:
+            return self.entries
+        except:
+            return []
+    
+    def getNumberOfUnreadItems(self):
+        return self.countUnread
+    
+    def getNumberOfEntries(self):
+        return len(self.entries)
+    
+    def getItem(self, index):
+        try:
+            return self.entries[index]
+        except:
+            return []
+    
+    def getContent(self, index):
+        content = ""
+        entry = self.entries[index]
+        if entry.has_key('summary'):
+            content = entry.get('summary', '')
+        if entry.has_key('content'):
+            if len(entry.content[0].value) > len(content):
+                content = entry.content[0].value
+        if content == "":
+            content = entry.get('description', '')
+        return content
+    
+    def getArticle(self, index):
+        
+        
+
+class FeedX:
     # Contains all the info about a single feed (articles, ...), and expose the data
     def __init__(self, name, url):
         self.entries = []
