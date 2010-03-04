@@ -26,6 +26,7 @@
 from os.path import isfile
 from os.path import isdir
 from shutil import rmtree
+from os import mkdir
 import pickle
 import md5
 import feedparser
@@ -54,6 +55,7 @@ class Feed:
         self.readItems = {}
         self.name = name
         self.url = url
+        self.countUnread = 0
         self.updateTime = "Never"
 
     def editFeed(self, url):
@@ -65,6 +67,27 @@ class Feed:
         file = open(configdir+getId(self.name)+".d/feed", "w")
         pickle.dump(self, file )
         file.close()
+        self.saveUnread(configdir)
+        
+    def saveUnread(self, configdir):
+        if not isdir(configdir+getId(self.name)+".d"):
+             mkdir(configdir+getId(self.name)+".d")
+        file = open(configdir+getId(self.name)+".d/unread", "w")
+        pickle.dump(self.readItems, file )
+        file.close()
+
+    def reloadUnread(self, configdir):
+        try:
+            file = open(configdir+getId(self.name)+".d/unread", "r")
+            self.readItems = pickle.load( file )
+            file.close()
+            self.countUnread = 0
+            for id in self.getIds():
+               if self.readItems[id]==False:
+                  self.countUnread = self.countUnread + 1
+        except:
+            pass
+        return self.countUnread
 
     def updateFeed(self, configdir, expiryTime=24):
         # Expiry time is in hours
@@ -73,22 +96,22 @@ class Feed:
         if len(tmp["entries"])>0:
            #reversedEntries = self.getEntries()
            #reversedEntries.reverse()
-           tmpEntries = []
+           tmpEntries = {}
            tmpIds = []
            for entry in tmp["entries"]:
                (dateTuple, date) = self.extractDate(entry)
                tmpEntry = {"title":entry["title"], "content":self.extractContent(entry),
-                            "date":date, "dateTuple":dateTuple, "link":entry["link"], images = [] }
+                            "date":date, "dateTuple":dateTuple, "link":entry["link"], "images":[] }
                id = self.generateUniqueId(tmpEntry)
                tmpEntries[id] = tmpEntry
                tmpIds.append(id)               
-           for entryId in self.getEntryIds():
+           for entryId in self.getIds():
                currentTime = time.time()
                expiry = float(expiryTime) * 3600.
-               articleTime = time.mktime(self.entries[endtryId]["dateTuple"])
+               articleTime = time.mktime(self.entries[entryId]["dateTuple"])
                if currentTime - articleTime < expiry:
                    if not id in tmpIds:
-                       tmpEntries[entryId] = self.entries[endtryId]
+                       tmpEntries[entryId] = self.entries[entryId]
                        tmpIds.append(entryId)
                    
            self.entries = tmpEntries
@@ -97,18 +120,19 @@ class Feed:
            # Initialize the new articles to unread
            tmpReadItems = self.readItems
            self.readItems = {}
-           for index in range(self.getNumberOfEntries()):
-               if not tmpReadItems.has_key(self.getUniqueId(index)):
-                   self.readItems[self.getUniqueId(index)] = False
+           for id in self.getIds():
+               if not tmpReadItems.has_key(id):
+                   self.readItems[id] = False
                else:
-                   self.readItems[self.getUniqueId(index)] = tmpReadItems[self.getUniqueId(index)]
-               if self.readItems[self.getUniqueId(index)]==False:
+                   self.readItems[id] = tmpReadItems[id]
+               if self.readItems[id]==False:
                   self.countUnread = self.countUnread + 1
            del tmp
            self.updateTime = time.asctime()
            self.saveFeed(configdir)
 
     def extractContent(self, entry):
+        content = ""
         if entry.has_key('summary'):
             content = entry.get('summary', '')
         if entry.has_key('content'):
@@ -155,7 +179,7 @@ class Feed:
     def getUniqueId(self, index):
         return self.ids[index]
     
-    def generateUniqueId(self, entry)
+    def generateUniqueId(self, entry):
         return getId(entry["date"] + entry["title"])
     
     def getUpdateTime(self):
@@ -163,6 +187,15 @@ class Feed:
     
     def getEntries(self):
         return self.entries
+    
+    def getIds(self):
+        return self.ids
+    
+    def getNextId(self, id):
+        return self.ids[(self.ids.index(id)+1) % self.getNumberOfEntries()]
+    
+    def getPreviousId(self, id):
+        return self.ids[(self.ids.index(id)-1) % self.getNumberOfEntries()]
     
     def getNumberOfUnreadItems(self):
         return self.countUnread
@@ -201,155 +234,6 @@ class Feed:
         text += "</body></html>"
         return text
         
-
-class FeedX:
-    # Contains all the info about a single feed (articles, ...), and expose the data
-    def __init__(self, name, url):
-        self.entries = []
-        self.readItems = {}
-        self.countUnread = 0
-        self.name = name
-        self.url = url
-        self.updateTime = "Never"
-
-    def editFeed(self, url):
-        self.url = url
-
-    def saveFeed(self, configdir):
-        file = open(configdir+getId(self.name), "w")
-        pickle.dump(self, file )
-        file.close()
-
-    def updateFeed(self, configdir, expiryTime=24):
-        # Expiry time is in hours
-        tmp=feedparser.parse(self.url)
-        # Check if the parse was succesful (number of entries > 0, else do nothing)
-        if len(tmp["entries"])>0:
-           #reversedEntries = self.getEntries()
-           #reversedEntries.reverse()
-           tmpIds = []
-           for entry in tmp["entries"]:
-               tmpIds.append(self.getUniqueId(-1, entry))
-           for entry in self.getEntries():
-               currentTime = time.time()
-               expiry = float(expiryTime) * 3600.
-               if entry.has_key("updated_parsed"):
-                   articleTime = time.mktime(entry["updated_parsed"])
-                   if currentTime - articleTime < expiry:
-                       id = self.getUniqueId(-1, entry)
-                       if not id in tmpIds:
-                           tmp["entries"].append(entry)
-                   
-           self.entries = tmp["entries"]
-           self.countUnread = 0
-           # Initialize the new articles to unread
-           tmpReadItems = self.readItems
-           self.readItems = {}
-           for index in range(self.getNumberOfEntries()):
-               if not tmpReadItems.has_key(self.getUniqueId(index)):
-                   self.readItems[self.getUniqueId(index)] = False
-               else:
-                   self.readItems[self.getUniqueId(index)] = tmpReadItems[self.getUniqueId(index)]
-               if self.readItems[self.getUniqueId(index)]==False:
-                  self.countUnread = self.countUnread + 1
-           del tmp
-           self.updateTime = time.asctime()
-           self.saveFeed(configdir)
-    
-    def setEntryRead(self, index):
-        if self.readItems[self.getUniqueId(index)]==False:
-            self.countUnread = self.countUnread - 1
-            self.readItems[self.getUniqueId(index)] = True
-            
-    def setEntryUnread(self, index):
-        if self.readItems[self.getUniqueId(index)]==True:
-            self.countUnread = self.countUnread + 1
-            self.readItems[self.getUniqueId(index)] = False
-    
-    def isEntryRead(self, index):
-        return self.readItems[self.getUniqueId(index)]
-    
-    def getTitle(self, index):
-        return self.entries[index]["title"]
-    
-    def getLink(self, index):
-        return self.entries[index]["link"]
-    
-    def getDate(self, index):
-        try:
-            return self.entries[index]["updated_parsed"]
-        except:
-            return time.localtime()
-    
-    def getUniqueId(self, index, entry=None):
-        if index >=0:
-            entry = self.entries[index]
-        if entry.has_key("updated_parsed"):
-            return getId(time.strftime("%a, %d %b %Y %H:%M:%S",entry["updated_parsed"]) + entry["title"])
-        elif entry.has_key("link"):
-            return getId(entry["link"] + entry["title"])
-        else:
-            return getId(entry["title"])
-    
-    def getUpdateTime(self):
-        return self.updateTime
-    
-    def getEntries(self):
-        try:
-            return self.entries
-        except:
-            return []
-    
-    def getNumberOfUnreadItems(self):
-        return self.countUnread
-    
-    def getNumberOfEntries(self):
-        return len(self.entries)
-    
-    def getItem(self, index):
-        try:
-            return self.entries[index]
-        except:
-            return []
-    
-    def getContent(self, index):
-        content = ""
-        entry = self.entries[index]
-        if entry.has_key('summary'):
-            content = entry.get('summary', '')
-        if entry.has_key('content'):
-            if len(entry.content[0].value) > len(content):
-                content = entry.content[0].value
-        if content == "":
-            content = entry.get('description', '')
-        return content
-    
-    def getArticle(self, index):
-        self.setEntryRead(index)
-        entry = self.entries[index]
-        title = entry.get('title', 'No title')
-        #content = entry.get('content', entry.get('summary_detail', {}))
-        content = self.getContent(index)
-
-        link = entry.get('link', 'NoLink')
-        if entry.has_key("updated_parsed"):
-            date = time.strftime("%a, %d %b %Y %H:%M:%S",entry["updated_parsed"])
-        elif entry.has_key("published_parsed"):
-            date = time.strftime("%a, %d %b %Y %H:%M:%S", entry["published_parsed"])
-        else:
-            date = ""
-        #text = '''<div style="color: black; background-color: white;">'''
-        text = '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">'
-        text += "<html><head><title>" + title + "</title>"
-        text += '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>\n'
-        text += '<style> body {-webkit-user-select: none;} </style></head>'
-        text += '<body><div><a href=\"' + link + '\">' + title + "</a>"
-        text += "<BR /><small><i>Date: " + date + "</i></small></div>"
-        text += "<BR /><BR />"
-        text += content
-        text += "</body></html>"
-        return text
-
 class ArchivedArticles(Feed):
     def addArchivedArticle(self, title, link, updated_parsed, configdir):
         entry = {}
@@ -443,9 +327,10 @@ class Listing:
         
     def loadFeed(self, key):
             if isfile(self.configdir+key+".d/feed"):
-                file = open(self.configdir+key)
+                file = open(self.configdir+key+".d/feed")
                 feed = pickle.load(file)
                 file.close()
+                #feed.reloadUnread(self.configdir)
             else:
                 #print key
                 title = self.listOfFeeds[key]["title"]
@@ -457,6 +342,8 @@ class Listing:
         for key in self.getListOfFeeds():
             feed = self.loadFeed(key)
             feed.updateFeed(self.configdir, expiryTime)
+            self.listOfFeeds[key]["unread"] = feed.getNumberOfUnreadItems()
+            self.listOfFeeds[key]["updateTime"] = feed.getUpdateTime()
             
     def updateFeed(self, key, expiryTime=24):
         feed = self.loadFeed(key)
@@ -467,17 +354,27 @@ class Listing:
     def editFeed(self, key, title, url):
         self.listOfFeeds[key]["title"] = title
         self.listOfFeeds[key]["url"] = url
-        self.feeds[key].editFeed(url)
-            
+        feed = self.loadFeed(key)
+        feed.editFeed(url)
+
     def getFeed(self, key):
-        return self.feeds[key]
+        feed = self.loadFeed(key)
+        feed.reloadUnread(self.configdir)
+        return feed
     
     def getFeedUpdateTime(self, key):
         #print self.listOfFeeds.has_key(key)
-        return self.feeds[key].getUpdateTime()
+        if not self.listOfFeeds[key].has_key("updateTime"):
+            self.listOfFeeds[key]["updateTime"] = "Never"
+        return self.listOfFeeds[key]["updateTime"]
     
     def getFeedNumberOfUnreadItems(self, key):
+        if not self.listOfFeeds[key].has_key("unread"):
+            self.listOfFeeds[key]["unread"] = 0
         return self.listOfFeeds[key]["unread"]
+
+    def updateUnread(self, key, unreadItems):
+        self.listOfFeeds[key]["unread"] = unreadItems
    
     def getFeedTitle(self, key):
         return self.listOfFeeds[key]["title"]
@@ -488,15 +385,15 @@ class Listing:
     def getListOfFeeds(self):
         return self.sortedKeys
     
-    def getNumberOfUnreadItems(self, key):
-        if self.listOfFeeds.has_key("unread"):
-           return self.listOfFeeds[key]["unread"]
-        else:
-           return 0
+    #def getNumberOfUnreadItems(self, key):
+    #    if self.listOfFeeds.has_key("unread"):
+    #       return self.listOfFeeds[key]["unread"]
+    #    else:
+    #       return 0
     
     def addFeed(self, title, url):
         if not self.listOfFeeds.has_key(getId(title)):
-            self.listOfFeeds[getId(title)] = {"title":title, "url":url, "read":0}
+            self.listOfFeeds[getId(title)] = {"title":title, "url":url, "unread":0, "updateTime":"Never"}
             self.sortedKeys.append(getId(title))
             self.saveConfig()
             #self.feeds[getId(title)] = Feed(title, url)

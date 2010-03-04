@@ -532,6 +532,8 @@ class DisplayFeed(hildon.StackableWindow):
         self.connect("destroy", self.destroyWindow)
         
     def destroyWindow(self, *args):
+        self.feed.saveUnread(CONFIGDIR)
+        self.listing.updateUnread(self.key, self.feed.getNumberOfUnreadItems())
         self.emit("feed-closed", self.key)
         self.destroy()
         #gobject.idle_add(self.feed.saveFeed, CONFIGDIR)
@@ -542,12 +544,12 @@ class DisplayFeed(hildon.StackableWindow):
         self.pannableFeed = hildon.PannableArea()
         self.pannableFeed.add_with_viewport(self.vboxFeed)
         self.pannableFeed.set_property("mov-mode", hildon.MOVEMENT_MODE_BOTH)
-        self.buttons = []
-        for index in range(self.feed.getNumberOfEntries()):
-            button = gtk.Button(self.feed.getTitle(index))
+        self.buttons = {}
+        for id in self.feed.getIds():
+            button = gtk.Button(self.feed.getTitle(id))
             button.set_alignment(0,0)
             label = button.child
-            if self.feed.isEntryRead(index):
+            if self.feed.isEntryRead(id):
                 #label.modify_font(pango.FontDescription("sans 16"))
                 label.modify_font(pango.FontDescription(self.config.getReadFont()))
             else:
@@ -558,11 +560,10 @@ class DisplayFeed(hildon.StackableWindow):
             label.set_line_wrap(True)
             
             label.set_size_request(self.get_size()[0]-50, -1)
-            button.connect("clicked", self.button_clicked, index)
-            self.buttons.append(button)
+            button.connect("clicked", self.button_clicked, id)
+            self.buttons[id] = button
             
-            self.vboxFeed.pack_start(button, expand=False)           
-            index=index+1
+            self.vboxFeed.pack_start(button, expand=False)
 
         self.add(self.pannableFeed)
         self.show_all()
@@ -614,14 +615,14 @@ class DisplayFeed(hildon.StackableWindow):
     def nextArticle(self, object, index):
         label = self.buttons[index].child
         label.modify_font(pango.FontDescription(self.config.getReadFont()))
-        index = (index+1) % self.feed.getNumberOfEntries()
-        self.button_clicked(object, index, next=True)
+        id = self.feed.getNextId(index)
+        self.button_clicked(object, id, next=True)
 
     def previousArticle(self, object, index):
         label = self.buttons[index].child
         label.modify_font(pango.FontDescription(self.config.getReadFont()))
-        index = (index-1) % self.feed.getNumberOfEntries()
-        self.button_clicked(object, index, previous=True)
+        id = self.feed.getPreviousId(index)
+        self.button_clicked(object, id, previous=True)
 
     def onArticleClosed(self, object, index):
         label = self.buttons[index].child
@@ -647,7 +648,7 @@ class DisplayFeed(hildon.StackableWindow):
     #    self.displayFeed()
         
     def buttonReadAllClicked(self, button):
-        for index in range(self.feed.getNumberOfEntries()):
+        for index in self.feed.getIds():
             self.feed.setEntryRead(index)
             label = self.buttons[index].child
             label.modify_font(pango.FontDescription(self.config.getReadFont()))
@@ -825,6 +826,7 @@ class FeedingIt:
 
     def onFeedClosed(self, object, key):
         #self.displayListing()
+        self.listing.saveConfig()
         self.refreshList()
         #self.buttons[key].set_text(self.listing.getFeedTitle(key), self.listing.getFeedUpdateTime(key) + " / " 
         #                    + str(self.listing.getFeedNumberOfUnreadItems(key)) + " Unread Items")
@@ -833,8 +835,8 @@ class FeedingIt:
     def run(self):
         self.window.connect("destroy", gtk.main_quit)
         gtk.main()
-        for key in self.listing.getListOfFeeds():
-            self.listing.getFeed(key).saveFeed(CONFIGDIR)
+        #for key in self.listing.getListOfFeeds():
+        #    self.listing.getFeed(key).saveFeed(CONFIGDIR)
         self.listing.saveConfig()
 
     def prefsClosed(self, *widget):
