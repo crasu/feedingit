@@ -32,23 +32,50 @@ import md5
 import feedparser
 import time
 import urllib2
+from BeautifulSoup import BeautifulSoup
+from urlparse import urlparse
 
 #CONFIGDIR="/home/user/.feedingit/"
 
 def getId(string):
     return md5.new(string).hexdigest()
 
-class Entry:
-    def __init__(self, title, content, date, link):
-        self.title = title
-        self.content = content
-        self.date = date
-        self.link = link
-        
 # Entry = {"title":XXX, "content":XXX, "date":XXX, "link":XXX, images = [] }
 
+class ImageHandler:
+    def __init__(self, configdir):
+        self.configdir = configdir
+        self.images = {}
+        
+    def addImage(self, key, baseurl, url):
+        filename = self.configdir+key+".d/"+getId(url)
+        if not isfile(filename):
+            try:
+                if url.startswith("http"):
+                    f = urllib2.urlopen(url)
+                else:
+                    f = urllib2.urlopen(baseurl+"/"+url)
+                outf = open(filename, "w")
+                outf.write(f.read())
+                f.close()
+                outf.close()
+            except:
+                print "Could not download" + url
+        if url in self.images:
+            self.images[url] += 1
+        else:
+            self.images[url] = 1
+        return "file://" + filename
+        
+    def removeImage(self, key, url):
+        filename = self.configdir+key+".d/"+getId(url)
+        self.images[url] -= 1
+        if self.images[url] == 0:
+            os.remove(filename)
+            del self.images[url]
+
 class Feed:
-    def __init__(self, name, url):
+    def __init__(self, uniqueId, name, url, imageHandler):
         self.titles = []
         self.entries = {}
         self.ids = []
@@ -57,28 +84,30 @@ class Feed:
         self.url = url
         self.countUnread = 0
         self.updateTime = "Never"
+        self.uniqueId = uniqueId
+        self.imageHandler = imageHandler
 
     def editFeed(self, url):
         self.url = url
 
     def saveFeed(self, configdir):
-        if not isdir(configdir+getId(self.name)+".d"):
-             mkdir(configdir+getId(self.name)+".d")
-        file = open(configdir+getId(self.name)+".d/feed", "w")
+        if not isdir(configdir+self.uniqueId+".d"):
+             mkdir(configdir+self.uniqueId+".d")
+        file = open(configdir+self.uniqueId+".d/feed", "w")
         pickle.dump(self, file )
         file.close()
         self.saveUnread(configdir)
         
     def saveUnread(self, configdir):
-        if not isdir(configdir+getId(self.name)+".d"):
-             mkdir(configdir+getId(self.name)+".d")
-        file = open(configdir+getId(self.name)+".d/unread", "w")
+        if not isdir(configdir+self.uniqueId+".d"):
+            mkdir(configdir+self.uniqueId+".d")
+        file = open(configdir+self.uniqueId+".d/unread", "w")
         pickle.dump(self.readItems, file )
         file.close()
 
     def reloadUnread(self, configdir):
         try:
-            file = open(configdir+getId(self.name)+".d/unread", "r")
+            file = open(configdir+self.uniqueId+".d/unread", "r")
             self.readItems = pickle.load( file )
             file.close()
             self.countUnread = 0
@@ -110,9 +139,13 @@ class Feed:
                expiry = float(expiryTime) * 3600.
                articleTime = time.mktime(self.entries[entryId]["dateTuple"])
                if currentTime - articleTime < expiry:
-                   if not id in tmpIds:
+                   if not entryId in tmpIds:
                        tmpEntries[entryId] = self.entries[entryId]
                        tmpIds.append(entryId)
+               else:
+                    if (not self.isEntryRead(entryId)) and (currentTime - articleTime < 2*expiry):
+                        tmpEntries[entryId] = self.entries[entryId]
+                        tmpIds.append(entryId)
                    
            self.entries = tmpEntries
            self.ids = tmpIds
@@ -152,6 +185,7 @@ class Feed:
         else:
             date1= ""
             date = ""
+        #print date1, date
         return (date1, date)
 
     def setEntryRead(self, id):
@@ -171,10 +205,15 @@ class Feed:
         return self.entries[id]["title"]
     
     def getLink(self, id):
+        if self.entries[id].has_key("contentLink"):
+            return self.entries[id]["contentLink"]
         return self.entries[id]["link"]
     
     def getDate(self, id):
         return self.entries[id]["date"]
+
+    def getDateTuple(self, id):
+        return self.entries[id]["dateTuple"]
  
     def getUniqueId(self, index):
         return self.ids[index]
@@ -210,7 +249,24 @@ class Feed:
             return []
     
     def getContent(self, id):
+        if self.entries[id].has_key("contentLink"):
+            file = open(self.entries[id]["contentLink"])
+            content = file.read()
+            file.close()
+            return content
         return self.entries[id]["content"]
+    
+    def removeEntry(self, id):
+        entry = self.entries[id]
+        for img in entry["images"]:
+            self.imageHandler.removeImage(self.uniqueId, img)
+        if entry.has_key["contentLink"]:
+            os.remove(entry["contentLink"])
+        self.entries.remove(id)
+        self.ids.remove(id)
+        if self.readItems[id]==False:
+            self.countUnread = self.countUnread - 1
+        self.readItems.remove(id)
     
     def getArticle(self, id):
         self.setEntryRead(id)
@@ -226,48 +282,83 @@ class Feed:
         text = '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">'
         text += "<html><head><title>" + title + "</title>"
         text += '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>\n'
-        text += '<style> body {-webkit-user-select: none;} </style></head>'
-        text += '<body><div><a href=\"' + link + '\">' + title + "</a>"
+        #text += '<style> body {-webkit-user-select: none;} </style>'
+        text += '</head><body><div><a href=\"' + link + '\">' + title + "</a>"
         text += "<BR /><small><i>Date: " + date + "</i></small></div>"
         text += "<BR /><BR />"
         text += content
         text += "</body></html>"
         return text
         
-class ArchivedArticles(Feed):
+class ArchivedArticles(Feed):    
     def addArchivedArticle(self, title, link, updated_parsed, configdir):
         entry = {}
         entry["title"] = title
         entry["link"] = link
-        entry["downloaded"] = False
         entry["summary"] = '<a href=\"' + link + '\">' + title + "</a>"
         entry["updated_parsed"] = updated_parsed
         entry["time"] = time.time()
-        self.entries.append(entry)
-        self.readItems[self.getUniqueId(len(self.entries)-1)] = False
+        #print entry
+        (dateTuple, date) = self.extractDate(entry)
+        tmpEntry = {"title":entry["title"], "content":self.extractContent(entry),
+                            "date":date, "dateTuple":dateTuple, "link":entry["link"], "images":[], "downloaded":False, "time":entry["time"] }
+        id = self.generateUniqueId(tmpEntry)
+        self.entries[id] = tmpEntry
+        self.ids.append(id)  
+        self.readItems[id] = False
         self.countUnread = self.countUnread + 1
         self.saveFeed(configdir)
-        #print entry
+        self.saveUnread(configdir)
         
     def updateFeed(self, configdir, expiryTime=24):
-        index = 0
-        for entry in self.getEntries():
+        for id in self.getIds():
+            entry = self.entries[id]
             if not entry["downloaded"]:
-                try:
+                #try:
                     f = urllib2.urlopen(entry["link"])
-                    entry["summary"] = f.read()
+                    #entry["content"] = f.read()
+                    html = f.read()
                     f.close()
-                    if len(entry["summary"]) > 0:
+                    soup = BeautifulSoup(html)
+                    images = soup.body('img')
+                    baseurl = ''.join(urlparse(entry["link"])[:-1])
+                    for img in images:
+                        filename = self.imageHandler.addImage(self.uniqueId, baseurl, img['src'])
+                        #filename = configdir+self.uniqueId+".d/"+getId(img['src'])
+                        #if not isfile(filename):
+                        #    try:
+                        #        if img['src'].startswith("http"):
+                        #            f = urllib2.urlopen(img['src'])
+                        #        else:
+                        #            f = urllib2.urlopen(baseurl+"/"+img['src'])
+                        #            #print baseurl+"/"+img['src']
+                        #        print filename
+                        #        outf = open(filename, "w")
+                        #        outf.write(f.read())
+                        #        f.close()
+                        #        outf.close()
+                        #    except:
+                        #        print "Could not download" + img['src']
+                        img['src']=filename
+                        entry["images"].append(filename)
+                    entry["contentLink"] = configdir+self.uniqueId+".d/"+id+".html"
+                    file = open(entry["contentLink"], "w")
+                    file.write(soup.prettify())
+                    file.close()
+                    if len(entry["content"]) > 0:
                         entry["downloaded"] = True
                         entry["time"] = time.time()
-                        self.setEntryUnread(index)
-                except:
-                    pass
+                        self.setEntryUnread(id)
+                #except:
+                #    pass
             currentTime = time.time()
             expiry = float(expiryTime) * 3600
             if currentTime - entry["time"] > expiry:
-                self.entries.remove(entry)
-            index += 1
+                if self.isEntryRead(id):
+                    self.removeEntry(id)
+                else:
+                    if currentTime - entry["time"] > 2*expiry:
+                        self.removeEntry(id)
         self.updateTime = time.asctime()
         self.saveFeed(configdir)
 
@@ -288,6 +379,12 @@ class Listing:
             file.close()
         else:
             self.listOfFeeds = {getId("Slashdot"):{"title":"Slashdot", "url":"http://rss.slashdot.org/Slashdot/slashdot", "unread":0, "updateTime":"Never"}, }
+        if isfile(self.configdir+"images.pickle"):
+            file = open(self.configdir+"images.pickle")
+            self.imageHandler = pickle.load(file)
+            file.close()
+        else:
+            self.imageHandler = ImageHandler(self.configdir)
         if self.listOfFeeds.has_key("font"):
             del self.listOfFeeds["font"]
         if self.listOfFeeds.has_key("feedingit-order"):
@@ -314,28 +411,39 @@ class Listing:
         #self.saveConfig()
 
     def addArchivedArticle(self, key, index):
-        title = self.getFeed(key).getTitle(index)
-        link = self.getFeed(key).getLink(index)
-        date = self.getFeed(key).getDate(index)
-        if not self.listOfFeeds.has_key(getId("Archived Articles")):
-            self.listOfFeeds[getId("Archived Articles")] = {"title":"Archived Articles", "url":""}
-            self.sortedKeys.append(getId("Archived Articles"))
-            self.feeds[getId("Archived Articles")] = ArchivedArticles("Archived Articles", "")
+        feed = self.getFeed(key)
+        title = feed.getTitle(index)
+        link = feed.getLink(index)
+        date = feed.getDateTuple(index)
+        if not self.listOfFeeds.has_key("ArchivedArticles"):
+            self.listOfFeeds["ArchivedArticles"] = {"title":"Archived Articles", "url":"", "unread":0, "updateTime":"Never"}
+            self.sortedKeys.append("ArchivedArticles")
+            #self.feeds["Archived Articles"] = ArchivedArticles("Archived Articles", "")
             self.saveConfig()
-            
-        self.getFeed(getId("Archived Articles")).addArchivedArticle(title, link, date, self.configdir)
+        archFeed = self.getFeed("ArchivedArticles")
+        archFeed.addArchivedArticle(title, link, date, self.configdir)
+        self.listOfFeeds[key]["unread"] = archFeed.getNumberOfUnreadItems()
         
     def loadFeed(self, key):
             if isfile(self.configdir+key+".d/feed"):
                 file = open(self.configdir+key+".d/feed")
                 feed = pickle.load(file)
                 file.close()
+                try:
+                    feed.uniqueId
+                    feed.imageHandler
+                except AttributeError:
+                    feed.uniqueId = getId(feed.name)
+                    feed.imageHandler = self.imageHandler
                 #feed.reloadUnread(self.configdir)
             else:
                 #print key
                 title = self.listOfFeeds[key]["title"]
                 url = self.listOfFeeds[key]["url"]
-                feed = Feed(title, url)
+                if key == "ArchivedArticles":
+                    feed = ArchivedArticles("ArchivedArticles", title, url, self.imageHandler)
+                else:
+                    feed = Feed(getId(title), title, url, self.imageHandler)
             return feed
         
     def updateFeeds(self, expiryTime=24):
@@ -405,7 +513,7 @@ class Listing:
         del self.listOfFeeds[key]
         self.sortedKeys.remove(key)
         #del self.feeds[key]
-        if isfile(self.configdir+key):
+        if isdir(self.configdir+key+".d/"):
            rmtree(self.configdir+key+".d/")
         self.saveConfig()
     
@@ -413,6 +521,9 @@ class Listing:
         self.listOfFeeds["feedingit-order"] = self.sortedKeys
         file = open(self.configdir+"feeds.pickle", "w")
         pickle.dump(self.listOfFeeds, file)
+        file.close()
+        file = open(self.configdir+"images.pickle", "w")
+        pickle.dump(self.imageHandler, file)
         file.close()
         
     def moveUp(self, key):

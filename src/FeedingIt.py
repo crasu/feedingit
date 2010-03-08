@@ -379,6 +379,7 @@ class DisplayArticle(hildon.StackableWindow):
             self.view = webkit.WebView()
             #self.view.set_editable(False)
         else:
+            import gtkhtml2
             self.view = gtkhtml2.View()
             self.document = gtkhtml2.Document()
             self.view.set_document(self.document)
@@ -389,10 +390,13 @@ class DisplayArticle(hildon.StackableWindow):
         #self.gestureId = self.pannable_article.connect('horizontal-movement', self.gesture)
 
         if self.config.getWebkitSupport():
-            self.view.load_string(self.text, "text/html", "utf-8", self.link)
+            if key=="ArchivedArticles":
+                self.view.open("file://" + self.link)
+            else:
+                self.view.load_html_string(self.text, self.link) # "text/html", "utf-8", self.link)
             self.view.set_zoom_level(float(config.getArtFontSize())/10.)
         else:
-            if not key == "1295627ef630df9d239abeb0ba631c3f":
+            if not key == "ArchivedArticles":
                 # Do not download images if the feed is "Archived Articles"
                 self.document.connect("request-url", self._signal_request_url)
             
@@ -642,6 +646,7 @@ class DisplayFeed(hildon.StackableWindow):
             
     def onDownloadsDone(self, *widget):
         self.vbox.destroy()
+        self.feed = self.listing.getFeed(self.key)
         self.displayFeed()
         #self.feed.updateFeed()
     #    self.clear()

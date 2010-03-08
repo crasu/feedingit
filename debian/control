@@ -10,7 +10,8 @@ XSBC-Bugtracker: https://garage.maemo.org/tracker/?func=browse&group_id=1202&ati
 Package: feedingit
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, python-gtkhtml2, python, python-hildon,
- libgtkhtml2-0, python-dbus, python-osso, python-gconf
+ libgtkhtml2-0, python-dbus, python-osso, python-gconf, python-beautifulsoup
+Recommends: python2.5-webkit
 Description:
  RSS Reader
  Its main features are:
