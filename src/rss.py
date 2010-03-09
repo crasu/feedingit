@@ -74,6 +74,33 @@ class ImageHandler:
             os.remove(filename)
             del self.images[url]
 
+class UnreadTracker:
+    def __init__(self):
+        self.readItems = {}
+        self.countUnread
+        
+    def setEntryUnread(self, id):
+        if self.readItems.has_key(id):
+            if self.readItems[id]==True:
+                self.countUnread = self.countUnread + 1
+                self.readItems[id] = False
+        else:
+            self.readItems[id] = False
+            self.countUnread = self.countUnread + 1
+    
+    def setEntryRead(self, id):
+        if self.readItems[id]==False:
+            self.countUnread = self.countUnread - 1
+            self.readItems[id] = True
+
+    def isRead(self, id):
+        return self.readItems[id]
+    
+    def removeEntry(self, id):
+        if self.readItems[id]==False:
+            self.countUnread = self.countUnread - 1
+        del self.readItems[id]
+
 class Feed:
     def __init__(self, uniqueId, name, url, imageHandler):
         self.titles = []
@@ -454,7 +481,7 @@ class Listing:
             self.listOfFeeds[key]["updateTime"] = feed.getUpdateTime()
             
     def updateFeed(self, key, expiryTime=24):
-        feed = self.loadFeed(key)
+        feed = self.getFeed(key)
         feed.updateFeed(self.configdir, expiryTime)
         self.listOfFeeds[key]["unread"] = feed.getNumberOfUnreadItems()
         self.listOfFeeds[key]["updateTime"] = feed.getUpdateTime()

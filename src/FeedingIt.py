@@ -556,9 +556,11 @@ class DisplayFeed(hildon.StackableWindow):
             if self.feed.isEntryRead(id):
                 #label.modify_font(pango.FontDescription("sans 16"))
                 label.modify_font(pango.FontDescription(self.config.getReadFont()))
+                label.modify_fg(gtk.STATE_NORMAL, gtk.gdk.color_parse("white"))
             else:
                 #print self.listing.getFont() + " bold"
                 label.modify_font(pango.FontDescription(self.config.getUnreadFont()))
+                label.modify_fg(gtk.STATE_NORMAL, gtk.gdk.color_parse("SkyBlue"))
                 #label.modify_font(pango.FontDescription("sans bold 23"))
                 #"sans bold 16"
             label.set_line_wrap(True)
@@ -619,18 +621,21 @@ class DisplayFeed(hildon.StackableWindow):
     def nextArticle(self, object, index):
         label = self.buttons[index].child
         label.modify_font(pango.FontDescription(self.config.getReadFont()))
+        label.modify_fg(gtk.STATE_NORMAL, gtk.gdk.color_parse("white"))
         id = self.feed.getNextId(index)
         self.button_clicked(object, id, next=True)
 
     def previousArticle(self, object, index):
         label = self.buttons[index].child
         label.modify_font(pango.FontDescription(self.config.getReadFont()))
+        label.modify_fg(gtk.STATE_NORMAL, gtk.gdk.color_parse("white"))
         id = self.feed.getPreviousId(index)
         self.button_clicked(object, id, previous=True)
 
     def onArticleClosed(self, object, index):
         label = self.buttons[index].child
         label.modify_font(pango.FontDescription(self.config.getReadFont()))
+        label.modify_fg(gtk.STATE_NORMAL, gtk.gdk.color_parse("white"))
         self.buttons[index].show()
 
     def button_update_clicked(self, button):
@@ -657,6 +662,7 @@ class DisplayFeed(hildon.StackableWindow):
             self.feed.setEntryRead(index)
             label = self.buttons[index].child
             label.modify_font(pango.FontDescription(self.config.getReadFont()))
+            label.modify_fg(gtk.STATE_NORMAL, gtk.gdk.color_parse("white"))
             self.buttons[index].show()
 
 
