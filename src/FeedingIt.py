@@ -446,10 +446,10 @@ class DisplayArticle(hildon.StackableWindow):
         x = self.coords[0] - event.x
         y = self.coords[1] - event.y
         
-        if (abs(y) < 20):
-            if (x > 30):
+        if (abs(y) < 30):
+            if (x > 15):
                 self.emit("article-previous", self.index)
-            elif (x<-30):
+            elif (x<-15):
                 self.emit("article-next", self.index)   
         #print x, y
         #print "Released"

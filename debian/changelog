@@ -1,3 +1,17 @@
+feedingit (0.5.2-0) unstable; urgency=low
+
+  * Fixed AddFeed from dbus (feedhandler)
+  * Added python2.5-webkit as dependency
+  
+ -- Yves <yves@marcoz.org>  Wed, 10 Mar 2010 19:05:19 -0800
+
+feedingit (0.5.1-1) unstable; urgency=low
+
+  * Fixed read/unread issue when updating feeds
+  * Unread messages are shown in SkyBlue colour
+  
+ -- Yves <yves@marcoz.org>  Mon, 08 Mar 2010 22:38:19 -0800
+
 feedingit (0.5.1-0) unstable; urgency=low
 
   * Added caching of images for Archived Articles

@@ -62,20 +62,20 @@ class Config():
             picker.set_name('HildonButton-finger')
             picker.set_alignment(0,0,1,1)
             self.buttons[setting] = picker
-            vbox.pack_start(picker)
+            vbox.pack_start(picker, expand=False)
         
         button = hildon.CheckButton(gtk.HILDON_SIZE_FINGER_HEIGHT)
         button.set_label("Auto-update Enabled")
         button.set_active(self.config["autoupdate"])
         button.connect("toggled", self.button_toggled, "autoupdate")
-        vbox.pack_start(button)
+        vbox.pack_start(button, expand=False)
 
         if self.has_webkit:
             button = hildon.CheckButton(gtk.HILDON_SIZE_FINGER_HEIGHT)
             button.set_label("Webkit Articles Enabled")
             button.set_active(self.config["webkit"])
             button.connect("toggled", self.button_toggled, "webkit")
-            vbox.pack_start(button)
+            vbox.pack_start(button, expand=False)
         
         panArea.add_with_viewport(vbox)
         
