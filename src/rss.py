@@ -145,9 +145,12 @@ class Feed:
             pass
         return self.countUnread
 
-    def updateFeed(self, configdir, expiryTime=24):
+    def updateFeed(self, configdir, expiryTime=24, proxy=None):
         # Expiry time is in hours
-        tmp=feedparser.parse(self.url)
+        if proxy == None:
+            tmp=feedparser.parse(self.url)
+        else:
+            tmp=feedparser.parse(self.url, handlers = [proxy])
         # Check if the parse was succesful (number of entries > 0, else do nothing)
         if len(tmp["entries"])>0:
            #reversedEntries = self.getEntries()
@@ -337,7 +340,7 @@ class ArchivedArticles(Feed):
         self.saveFeed(configdir)
         self.saveUnread(configdir)
         
-    def updateFeed(self, configdir, expiryTime=24):
+    def updateFeed(self, configdir, expiryTime=24, proxy=None):
         for id in self.getIds():
             entry = self.entries[id]
             if not entry["downloaded"]:
@@ -473,16 +476,16 @@ class Listing:
                     feed = Feed(getId(title), title, url, self.imageHandler)
             return feed
         
-    def updateFeeds(self, expiryTime=24):
+    def updateFeeds(self, expiryTime=24, proxy=None):
         for key in self.getListOfFeeds():
             feed = self.loadFeed(key)
-            feed.updateFeed(self.configdir, expiryTime)
+            feed.updateFeed(self.configdir, expiryTime, proxy)
             self.listOfFeeds[key]["unread"] = feed.getNumberOfUnreadItems()
             self.listOfFeeds[key]["updateTime"] = feed.getUpdateTime()
             
-    def updateFeed(self, key, expiryTime=24):
+    def updateFeed(self, key, expiryTime=24, proxy=None):
         feed = self.getFeed(key)
-        feed.updateFeed(self.configdir, expiryTime)
+        feed.updateFeed(self.configdir, expiryTime, proxy)
         self.listOfFeeds[key]["unread"] = feed.getNumberOfUnreadItems()
         self.listOfFeeds[key]["updateTime"] = feed.getUpdateTime()
         

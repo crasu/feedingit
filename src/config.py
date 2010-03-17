@@ -27,6 +27,8 @@ import gtk
 import hildon
 import ConfigParser
 import gobject
+import gconf
+import urllib2
 
 section = "FeedingIt"
 ranges = { "updateInterval":[0.5, 1, 2, 4, 12, 24], "expiry":[24, 48, 72], "fontSize":range(12,24), "orientation":["Automatic", "Landscape", "Portrait"], "artFontSize":[10, 12, 14, 16, 18, 20]}
@@ -180,3 +182,10 @@ class Config():
             return self.config["webkit"]
         else:
             return False
+    def getProxy(self):
+        if gconf.client_get_default().get_bool('/system/http_proxy/use_http_proxy'):
+            port = gconf.client_get_default().get_int('/system/http_proxy/port')
+            http = gconf.client_get_default().get_string('/system/http_proxy/host')
+            proxy = proxy = urllib2.ProxyHandler( {"http":"http://%s:%s/"% (http,port)} )
+            return (True, proxy)
+        return (False, None)

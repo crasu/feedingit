@@ -1,3 +1,11 @@
+feedingit (0.5.2-2) unstable; urgency=low
+
+  * Fixed horizontal scrolling
+  * Use theme color for unread items
+  * Added proxy support for feed download
+  
+ -- Yves <yves@marcoz.org>  Wed, 10 Mar 2010 19:05:19 -0800
+
 feedingit (0.5.2-0) unstable; urgency=low
 
   * Fixed AddFeed from dbus (feedhandler)

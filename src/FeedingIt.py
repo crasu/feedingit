@@ -162,7 +162,11 @@ class Download(threading.Thread):
         self.config = config
         
     def run (self):
-        self.listing.updateFeed(self.key, self.config.getExpiry())
+        (use_proxy, proxy) = self.config.getProxy()
+        if use_proxy:
+            self.listing.updateFeed(self.key, self.config.getExpiry(), proxy=proxy)
+        else:
+            self.listing.updateFeed(self.key, self.config.getExpiry())
 
         
 class DownloadBar(gtk.ProgressBar):
@@ -435,7 +439,7 @@ class DisplayArticle(hildon.StackableWindow):
         self.destroyId = self.connect("destroy", self.destroyWindow)
         
         self.view.connect("button_press_event", self.button_pressed)
-        self.view.connect("button_release_event", self.button_released)
+        self.gestureId = self.view.connect("button_release_event", self.button_released)
         #self.timeout_handler_id = gobject.timeout_add(300, self.reloadArticle)
 
     def button_pressed(self, window, event):
@@ -560,7 +564,9 @@ class DisplayFeed(hildon.StackableWindow):
             else:
                 #print self.listing.getFont() + " bold"
                 label.modify_font(pango.FontDescription(self.config.getUnreadFont()))
-                label.modify_fg(gtk.STATE_NORMAL, gtk.gdk.color_parse("SkyBlue"))
+                #label.modify_fg(gtk.STATE_NORMAL, gtk.gdk.color_parse("SkyBlue"))
+                fg_color = fg_button.child.get_children()[0].get_children()[0].get_children()[1].get_style().fg[gtk.STATE_NORMAL]
+                label.modify_fg(gtk.STATE_NORMAL, fg_color)
                 #label.modify_font(pango.FontDescription("sans bold 23"))
                 #"sans bold 16"
             label.set_line_wrap(True)
@@ -815,6 +821,9 @@ class FeedingIt:
             button.connect("clicked", self.buttonFeedClicked, self, self.window, key)
             self.vboxListing.pack_start(button, expand=False)
             self.buttons[key] = button
+            global fg_button
+            fg_button = button
+            #fg_color = button.child.get_children()[0].get_children()[0].get_children()[1].get_style().fg[gtk.STATE_NORMAL]
             
         #if type(self.downloadDialog).__name__=="DownloadBar":
         #    self.vboxListing.pack_start(self.downloadDialog)
