@@ -19,7 +19,7 @@
 # ============================================================================
 # Name        : FeedingIt.py
 # Author      : Yves Marcoz
-# Version     : 0.5.0
+# Version     : 0.5.2
 # Description : Simple RSS Reader
 # ============================================================================
 
@@ -54,6 +54,10 @@ from opml import GetOpmlData, ExportOpmlData
 import socket
 timeout = 5
 socket.setdefaulttimeout(timeout)
+
+color_style = gtk.rc_get_style_by_paths(gtk.settings_get_default() , 'GtkButton', 'osso-logical-colors', gtk.Button)
+fg_colog = color_style.lookup_color('ActiveTextColor')
+del color_style
 
 CONFIGDIR="/home/user/.feedingit/"
 
@@ -565,7 +569,7 @@ class DisplayFeed(hildon.StackableWindow):
                 #print self.listing.getFont() + " bold"
                 label.modify_font(pango.FontDescription(self.config.getUnreadFont()))
                 #label.modify_fg(gtk.STATE_NORMAL, gtk.gdk.color_parse("SkyBlue"))
-                fg_color = fg_button.child.get_children()[0].get_children()[0].get_children()[1].get_style().fg[gtk.STATE_NORMAL]
+                #fg_color = fg_button.child.get_children()[0].get_children()[0].get_children()[1].get_style().fg[gtk.STATE_NORMAL]
                 label.modify_fg(gtk.STATE_NORMAL, fg_color)
                 #label.modify_font(pango.FontDescription("sans bold 23"))
                 #"sans bold 16"
@@ -739,8 +743,8 @@ class FeedingIt:
     def button_markAll(self, button):
         for key in self.listing.getListOfFeeds():
             feed = self.listing.getFeed(key)
-            for index in range(feed.getNumberOfEntries()):
-                feed.setEntryRead(index)
+            for id in feed.getIds():
+                feed.setEntryRead(id)
         self.refreshList()
 
     def button_export_clicked(self, button):
@@ -821,12 +825,7 @@ class FeedingIt:
             button.connect("clicked", self.buttonFeedClicked, self, self.window, key)
             self.vboxListing.pack_start(button, expand=False)
             self.buttons[key] = button
-            global fg_button
-            fg_button = button
-            #fg_color = button.child.get_children()[0].get_children()[0].get_children()[1].get_style().fg[gtk.STATE_NORMAL]
-            
-        #if type(self.downloadDialog).__name__=="DownloadBar":
-        #    self.vboxListing.pack_start(self.downloadDialog)
+     
         self.mainVbox.pack_start(self.pannableListing)
         self.window.show_all()
 
