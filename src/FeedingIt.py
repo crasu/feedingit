@@ -28,12 +28,12 @@ import feedparser
 import pango
 import hildon
 #import gtkhtml2
-try:
-    import webkit
-    has_webkit=True
-except:
-    import gtkhtml2
-    has_webkit=False
+#try:
+import webkit
+#    has_webkit=True
+#except:
+#    import gtkhtml2
+#    has_webkit=False
 import time
 import dbus
 import pickle
@@ -56,7 +56,7 @@ timeout = 5
 socket.setdefaulttimeout(timeout)
 
 color_style = gtk.rc_get_style_by_paths(gtk.settings_get_default() , 'GtkButton', 'osso-logical-colors', gtk.Button)
-fg_colog = color_style.lookup_color('ActiveTextColor')
+fg_color = color_style.lookup_color('ActiveTextColor')
 del color_style
 
 CONFIGDIR="/home/user/.feedingit/"
@@ -120,42 +120,42 @@ class AddWidgetWizard(hildon.WizardDialog):
         else:
             return True
 
-class GetImage(threading.Thread):
-    def __init__(self, url, stream):
-        threading.Thread.__init__(self)
-        self.url = url
-        self.stream = stream
-    
-    def run(self):
-        f = urllib2.urlopen(self.url)
-        data = f.read()
-        f.close()
-        self.stream.write(data)
-        self.stream.close()
-
-class ImageDownloader():
-    def __init__(self):
-        self.images = []
-        self.downloading = False
-        
-    def queueImage(self, url, stream):
-        self.images.append((url, stream))
-        if not self.downloading:
-            self.downloading = True
-            gobject.timeout_add(50, self.checkQueue)
-        
-    def checkQueue(self):
-        for i in range(4-threading.activeCount()):
-            if len(self.images) > 0:
-                (url, stream) = self.images.pop() 
-                GetImage(url, stream).start()
-        if len(self.images)>0:
-            gobject.timeout_add(200, self.checkQueue)
-        else:
-            self.downloading=False
-            
-    def stopAll(self):
-        self.images = []
+#class GetImage(threading.Thread):
+#    def __init__(self, url, stream):
+#        threading.Thread.__init__(self)
+#        self.url = url
+#        self.stream = stream
+#    
+#    def run(self):
+#        f = urllib2.urlopen(self.url)
+#        data = f.read()
+#        f.close()
+#        self.stream.write(data)
+#        self.stream.close()
+#
+#class ImageDownloader():
+#    def __init__(self):
+#        self.images = []
+#        self.downloading = False
+#        
+#    def queueImage(self, url, stream):
+#        self.images.append((url, stream))
+#        if not self.downloading:
+#            self.downloading = True
+#            gobject.timeout_add(50, self.checkQueue)
+#        
+#    def checkQueue(self):
+#        for i in range(4-threading.activeCount()):
+#            if len(self.images) > 0:
+#                (url, stream) = self.images.pop() 
+#                GetImage(url, stream).start()
+#        if len(self.images)>0:
+#            gobject.timeout_add(200, self.checkQueue)
+#        else:
+#            self.downloading=False
+#            
+#    def stopAll(self):
+#        self.images = []
         
         
 class Download(threading.Thread):
@@ -168,9 +168,9 @@ class Download(threading.Thread):
     def run (self):
         (use_proxy, proxy) = self.config.getProxy()
         if use_proxy:
-            self.listing.updateFeed(self.key, self.config.getExpiry(), proxy=proxy)
+            self.listing.updateFeed(self.key, self.config.getExpiry(), proxy=proxy, imageCache=self.config.getImageCache() )
         else:
-            self.listing.updateFeed(self.key, self.config.getExpiry())
+            self.listing.updateFeed(self.key, self.config.getExpiry(), imageCache=self.config.getImageCache() )
 
         
 class DownloadBar(gtk.ProgressBar):
@@ -370,48 +370,48 @@ class SortList(gtk.Dialog):
                
 
 class DisplayArticle(hildon.StackableWindow):
-    def __init__(self, title, text, link, index, key, listing, config):
+    def __init__(self, feed, id, key, config):
         hildon.StackableWindow.__init__(self)
-        self.imageDownloader = ImageDownloader()
-        self.listing=listing
+        #self.imageDownloader = ImageDownloader()
+        self.feed = feed
+        #self.listing=listing
         self.key = key
-        self.index = index
-        self.text = text
-        self.link = link
-        self.set_title(title)
+        self.id = id
+        self.set_title(feed.getTitle(id))
         self.config = config
-        self.images = []
         
         # Init the article display
-        if self.config.getWebkitSupport():
-            self.view = webkit.WebView()
+        #if self.config.getWebkitSupport():
+        self.view = webkit.WebView()
             #self.view.set_editable(False)
-        else:
-            import gtkhtml2
-            self.view = gtkhtml2.View()
-            self.document = gtkhtml2.Document()
-            self.view.set_document(self.document)
-            self.document.connect("link_clicked", self._signal_link_clicked)
+        #else:
+        #    import gtkhtml2
+        #    self.view = gtkhtml2.View()
+        #    self.document = gtkhtml2.Document()
+        #    self.view.set_document(self.document)
+        #    self.document.connect("link_clicked", self._signal_link_clicked)
         self.pannable_article = hildon.PannableArea()
         self.pannable_article.add(self.view)
         #self.pannable_article.set_property("mov-mode", hildon.MOVEMENT_MODE_BOTH)
         #self.gestureId = self.pannable_article.connect('horizontal-movement', self.gesture)
 
-        if self.config.getWebkitSupport():
-            if key=="ArchivedArticles":
-                self.view.open("file://" + self.link)
-            else:
-                self.view.load_html_string(self.text, self.link) # "text/html", "utf-8", self.link)
-            self.view.set_zoom_level(float(config.getArtFontSize())/10.)
-        else:
-            if not key == "ArchivedArticles":
+        #if self.config.getWebkitSupport():
+        contentLink = self.feed.getContentLink(self.id)
+        self.feed.setEntryRead(self.id)
+        #if key=="ArchivedArticles":
+        self.view.open("file://" + contentLink)
+        #else:
+        #self.view.load_html_string(self.text, contentLink) # "text/html", "utf-8", self.link)
+        self.view.set_zoom_level(float(config.getArtFontSize())/10.)
+        #else:
+        #    if not key == "ArchivedArticles":
                 # Do not download images if the feed is "Archived Articles"
-                self.document.connect("request-url", self._signal_request_url)
+        #        self.document.connect("request-url", self._signal_request_url)
             
-            self.document.clear()
-            self.document.open_stream("text/html")
-            self.document.write_stream(self.text)
-            self.document.close_stream()
+        #    self.document.clear()
+        #    self.document.open_stream("text/html")
+        #    self.document.write_stream(self.text)
+        #    self.document.close_stream()
         
         menu = hildon.AppMenu()
         # Create a button and add it to the menu
@@ -422,7 +422,7 @@ class DisplayArticle(hildon.StackableWindow):
         
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
         button.set_label("Open in Browser")
-        button.connect("clicked", self._signal_link_clicked, self.link)
+        button.connect("clicked", self._signal_link_clicked, self.feed.getExternalLink(self.id))
         menu.append(button)
         
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
@@ -456,9 +456,9 @@ class DisplayArticle(hildon.StackableWindow):
         
         if (abs(y) < 30):
             if (x > 15):
-                self.emit("article-previous", self.index)
+                self.emit("article-previous", self.id)
             elif (x<-15):
-                self.emit("article-next", self.index)   
+                self.emit("article-next", self.id)   
         #print x, y
         #print "Released"
 
@@ -472,8 +472,8 @@ class DisplayArticle(hildon.StackableWindow):
 
     def destroyWindow(self, *args):
         self.disconnect(self.destroyId)
-        self.emit("article-closed", self.index)
-        self.imageDownloader.stopAll()
+        self.emit("article-closed", self.id)
+        #self.imageDownloader.stopAll()
         self.destroy()
         
     def horiz_scrolling_button(self, *widget):
@@ -482,7 +482,7 @@ class DisplayArticle(hildon.StackableWindow):
         
     def archive_button(self, *widget):
         # Call the listing.addArchivedArticle
-        self.listing.addArchivedArticle(self.key, self.index)
+        self.listing.addArchivedArticle(self.key, self.id)
         
     #def reloadArticle(self, *widget):
     #    if threading.activeCount() > 1:
@@ -502,9 +502,9 @@ class DisplayArticle(hildon.StackableWindow):
         iface = dbus.Interface(proxy, 'com.nokia.osso_browser')
         iface.load_url(link)
 
-    def _signal_request_url(self, object, url, stream):
+    #def _signal_request_url(self, object, url, stream):
         #print url
-        self.imageDownloader.queueImage(url, stream)
+    #    self.imageDownloader.queueImage(url, stream)
         #imageThread = GetImage(url)
         #imageThread.start()
         #self.images.append((stream, imageThread))
@@ -588,7 +588,8 @@ class DisplayFeed(hildon.StackableWindow):
         self.remove(self.pannableFeed)
 
     def button_clicked(self, button, index, previous=False, next=False):
-        newDisp = DisplayArticle(self.feedTitle, self.feed.getArticle(index), self.feed.getLink(index), index, self.key, self.listing, self.config)
+        #newDisp = DisplayArticle(self.feedTitle, self.feed.getArticle(index), self.feed.getLink(index), index, self.key, self.listing, self.config)
+        newDisp = DisplayArticle(self.feed, index, self.key, self.config)
         stack = hildon.WindowStack.get_default()
         if previous:
             tmp = stack.peek()
@@ -687,15 +688,15 @@ class FeedingIt:
         self.mainVbox.pack_start(self.pannableListing)
         self.window.add(self.mainVbox)
         self.window.show_all()
-        self.config = Config(self.window, CONFIGDIR+"config.ini", has_webkit)
+        self.config = Config(self.window, CONFIGDIR+"config.ini")
         gobject.idle_add(self.createWindow)
         
     def createWindow(self):
         self.listing = Listing(CONFIGDIR)
         
         self.downloadDialog = False
-        self.orientation = FremantleRotation("FeedingIt", main_window=self.window)
-        self.orientation.set_mode(self.config.getOrientation())
+        #self.orientation = FremantleRotation("FeedingIt", main_window=self.window)
+        #self.orientation.set_mode(self.config.getOrientation())
         
         menu = hildon.AppMenu()
         # Create a button and add it to the menu
@@ -732,8 +733,8 @@ class FeedingIt:
         self.window.set_app_menu(menu)
         menu.show_all()
         
-        #self.feedWindow = hildon.StackableWindow()
-        #self.articleWindow = hildon.StackableWindow()
+        self.feedWindow = hildon.StackableWindow()
+        self.articleWindow = hildon.StackableWindow()
 
         self.displayListing()
         self.autoupdate = False
@@ -745,6 +746,8 @@ class FeedingIt:
             feed = self.listing.getFeed(key)
             for id in feed.getIds():
                 feed.setEntryRead(id)
+            feed.saveUnread(CONFIGDIR)
+            self.listing.updateUnread(key, feed.getNumberOfUnreadItems())
         self.refreshList()
 
     def button_export_clicked(self, button):

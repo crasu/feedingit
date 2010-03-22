@@ -36,10 +36,9 @@ titles = {"updateInterval":"Auto-update Interval", "expiry":"Expiry For Articles
 subtitles = {"updateInterval":"Update every %s hours", "expiry":"Delete articles after %s hours", "fontSize":"%s pixels", "orientation":"%s", "artFontSize":"%s pixels"}
 
 class Config():
-    def __init__(self, parent, configFilename, has_webkit):
+    def __init__(self, parent, configFilename):
         self.configFilename = configFilename
         self.parent = parent
-        self.has_webkit = has_webkit
         # Load config
         self.loadConfig()
         
@@ -51,10 +50,7 @@ class Config():
         
         vbox = gtk.VBox(False, 10)
         self.buttons = {}
-        if self.has_webkit:
-            settings = ["fontSize", "artFontSize", "expiry", "orientation", "updateInterval",]
-        else:
-            settings = ["fontSize", "expiry", "orientation", "updateInterval",]
+        settings = ["fontSize", "expiry", "orientation", "updateInterval",]
         for setting in settings:
             picker = hildon.PickerButton(gtk.HILDON_SIZE_FINGER_HEIGHT, hildon.BUTTON_ARRANGEMENT_VERTICAL)
             selector = self.create_selector(ranges[setting], setting)
@@ -72,12 +68,11 @@ class Config():
         button.connect("toggled", self.button_toggled, "autoupdate")
         vbox.pack_start(button, expand=False)
 
-        if self.has_webkit:
-            button = hildon.CheckButton(gtk.HILDON_SIZE_FINGER_HEIGHT)
-            button.set_label("Webkit Articles Enabled")
-            button.set_active(self.config["webkit"])
-            button.connect("toggled", self.button_toggled, "webkit")
-            vbox.pack_start(button, expand=False)
+        button = hildon.CheckButton(gtk.HILDON_SIZE_FINGER_HEIGHT)
+        button.set_label("Image Caching Enabled")
+        button.set_active(self.config["imageCache"])
+        button.connect("toggled", self.button_toggled, "imageCache")
+        vbox.pack_start(button, expand=False)
         
         panArea.add_with_viewport(vbox)
         
@@ -121,7 +116,7 @@ class Config():
             self.config["autoupdate"] = configParser.getboolean(section, "autoupdate")
             self.config["updateInterval"] = configParser.getfloat(section, "updateInterval")
             self.config["orientation"] = configParser.get(section, "orientation")
-            self.config["webkit"] = configParser.getboolean(section, "webkit")
+            self.config["imageCache"] = configParser.getboolean(section, "imageCache")
         except:
             self.config["fontSize"] = 17
             self.config["artFontSize"] = 14
@@ -129,7 +124,7 @@ class Config():
             self.config["autoupdate"] = False
             self.config["updateInterval"] = 4
             self.config["orientation"] = "Automatic"
-            self.config["webkit"] = self.has_webkit
+            self.config["imageCache"] = False
         
     def saveConfig(self):
         configParser = ConfigParser.RawConfigParser()
@@ -140,7 +135,7 @@ class Config():
         configParser.set(section, 'autoupdate', str(self.config["autoupdate"]))
         configParser.set(section, 'updateInterval', str(self.config["updateInterval"]))
         configParser.set(section, 'orientation', str(self.config["orientation"]))
-        configParser.set(section, 'webkit', str(self.config["webkit"]))
+        configParser.set(section, 'imageCache', str(self.config["imageCache"]))
 
         # Writing our configuration file
         file = open(self.configFilename, 'wb')
@@ -177,11 +172,8 @@ class Config():
         return "sans bold %s" % self.config["fontSize"]
     def getOrientation(self):
         return ranges["orientation"].index(self.config["orientation"])
-    def getWebkitSupport(self):
-        if self.has_webkit:
-            return self.config["webkit"]
-        else:
-            return False
+    def getImageCache(self):
+        return self.config["imageCache"]
     def getProxy(self):
         if gconf.client_get_default().get_bool('/system/http_proxy/use_http_proxy'):
             port = gconf.client_get_default().get_int('/system/http_proxy/port')

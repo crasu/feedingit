@@ -26,7 +26,7 @@
 from os.path import isfile
 from os.path import isdir
 from shutil import rmtree
-from os import mkdir
+from os import mkdir, remove
 import pickle
 import md5
 import feedparser
@@ -61,45 +61,24 @@ class ImageHandler:
                 outf.close()
             except:
                 print "Could not download" + url
-        if url in self.images:
-            self.images[url] += 1
+        if filename in self.images:
+            self.images[filename] += 1
         else:
-            self.images[url] = 1
-        return "file://" + filename
+            self.images[filename] = 1
+        return filename
         
-    def removeImage(self, key, url):
-        filename = self.configdir+key+".d/"+getId(url)
-        self.images[url] -= 1
-        if self.images[url] == 0:
-            os.remove(filename)
-            del self.images[url]
-
-class UnreadTracker:
-    def __init__(self):
-        self.readItems = {}
-        self.countUnread
-        
-    def setEntryUnread(self, id):
-        if self.readItems.has_key(id):
-            if self.readItems[id]==True:
-                self.countUnread = self.countUnread + 1
-                self.readItems[id] = False
-        else:
-            self.readItems[id] = False
-            self.countUnread = self.countUnread + 1
-    
-    def setEntryRead(self, id):
-        if self.readItems[id]==False:
-            self.countUnread = self.countUnread - 1
-            self.readItems[id] = True
-
-    def isRead(self, id):
-        return self.readItems[id]
-    
-    def removeEntry(self, id):
-        if self.readItems[id]==False:
-            self.countUnread = self.countUnread - 1
-        del self.readItems[id]
+    def removeImage(self, key, filename):
+        #filename = self.configdir+key+".d/"+getId(url)
+        try:
+            self.images[filename] -= 1
+        except:
+            self.images[filename] = 0 #Delete image
+        try:
+            if self.images[filename] == 0:
+                remove(filename) #os.remove
+                del self.images[filename]
+        except:
+            print "Could not remove image %s" % filename
 
 class Feed:
     def __init__(self, uniqueId, name, url, imageHandler):
@@ -145,7 +124,7 @@ class Feed:
             pass
         return self.countUnread
 
-    def updateFeed(self, configdir, expiryTime=24, proxy=None):
+    def updateFeed(self, configdir, expiryTime=24, proxy=None, imageCache=False):
         # Expiry time is in hours
         if proxy == None:
             tmp=feedparser.parse(self.url)
@@ -155,6 +134,8 @@ class Feed:
         if len(tmp["entries"])>0:
            #reversedEntries = self.getEntries()
            #reversedEntries.reverse()
+           if not isdir(configdir+self.uniqueId+".d"):
+               mkdir(configdir+self.uniqueId+".d")
            tmpEntries = {}
            tmpIds = []
            for entry in tmp["entries"]:
@@ -162,20 +143,41 @@ class Feed:
                tmpEntry = {"title":entry["title"], "content":self.extractContent(entry),
                             "date":date, "dateTuple":dateTuple, "link":entry["link"], "images":[] }
                id = self.generateUniqueId(tmpEntry)
-               tmpEntries[id] = tmpEntry
-               tmpIds.append(id)               
-           for entryId in self.getIds():
-               currentTime = time.time()
-               expiry = float(expiryTime) * 3600.
-               articleTime = time.mktime(self.entries[entryId]["dateTuple"])
-               if currentTime - articleTime < expiry:
-                   if not entryId in tmpIds:
+               if not id in self.ids:
+                   
+                   soup = BeautifulSoup(tmpEntry["content"])
+                   images = soup('img')
+                   baseurl = ''.join(urlparse(tmpEntry["link"])[:-1])
+                   if imageCache:
+                        for img in images:
+                            filename = self.imageHandler.addImage(self.uniqueId, baseurl, img['src'])
+                            img['src']=filename
+                            tmpEntry["images"].append(filename)
+                   tmpEntry["contentLink"] = configdir+self.uniqueId+".d/"+id+".html"
+                   file = open(tmpEntry["contentLink"], "w")
+                   file.write(soup.prettify())
+                   file.close()
+                   tmpEntries[id] = tmpEntry
+                   tmpIds.append(id)
+            
+           for entryId in self.getIds()[:]:
+                currentTime = time.time()
+                expiry = float(expiryTime) * 3600.
+                try:
+                    articleTime = time.mktime(self.entries[entryId]["dateTuple"])
+                    if currentTime - articleTime < expiry:
                        tmpEntries[entryId] = self.entries[entryId]
                        tmpIds.append(entryId)
-               else:
-                    if (not self.isEntryRead(entryId)) and (currentTime - articleTime < 2*expiry):
-                        tmpEntries[entryId] = self.entries[entryId]
-                        tmpIds.append(entryId)
+                    else:
+                        if (not self.isEntryRead(entryId)) and (currentTime - articleTime < 2*expiry):
+                            tmpEntries[entryId] = self.entries[entryId]
+                            tmpIds.append(entryId)
+                        else:
+                            self.removeEntry(id)
+                except:
+                    self.removeEntry(id)
+                    print "Error purging old articles %s" % id
+                    
                    
            self.entries = tmpEntries
            self.ids = tmpIds
@@ -234,9 +236,12 @@ class Feed:
     def getTitle(self, id):
         return self.entries[id]["title"]
     
-    def getLink(self, id):
+    def getContentLink(self, id):
         if self.entries[id].has_key("contentLink"):
             return self.entries[id]["contentLink"]
+        return self.entries[id]["link"]
+    
+    def getExternalLink(self, id):
         return self.entries[id]["link"]
     
     def getDate(self, id):
@@ -287,16 +292,33 @@ class Feed:
         return self.entries[id]["content"]
     
     def removeEntry(self, id):
-        entry = self.entries[id]
-        for img in entry["images"]:
-            self.imageHandler.removeImage(self.uniqueId, img)
-        if entry.has_key["contentLink"]:
-            os.remove(entry["contentLink"])
-        self.entries.remove(id)
-        self.ids.remove(id)
-        if self.readItems[id]==False:
-            self.countUnread = self.countUnread - 1
-        self.readItems.remove(id)
+        #try:
+        if self.entries.has_key(id):
+            entry = self.entries[id]
+            if entry.has_key("images"):
+                for img in entry["images"]:
+                    self.imageHandler.removeImage(self.uniqueId, img)
+            
+            if entry.has_key("contentLink"):
+                try:
+                    remove(entry["contentLink"])  #os.remove
+                except:
+                    print "File not found for deletion: %s" % entry["contentLink"]
+            del self.entries[id]
+        else:
+            print "Entries has no %s key" % id
+        if id in self.ids:
+            self.ids.remove(id)
+        else:
+            print "Ids has no %s key" % id
+        if self.readItems.has_key(id):
+            if self.readItems[id]==False:
+                self.countUnread = self.countUnread - 1
+            del self.readItems[id]
+        else:
+            print "ReadItems has no %s key" % id
+        #except:
+        #    print "Error removing entry %s" %id
     
     def getArticle(self, id):
         self.setEntryRead(id)
@@ -340,7 +362,7 @@ class ArchivedArticles(Feed):
         self.saveFeed(configdir)
         self.saveUnread(configdir)
         
-    def updateFeed(self, configdir, expiryTime=24, proxy=None):
+    def updateFeed(self, configdir, expiryTime=24, proxy=None, imageCache=False):
         for id in self.getIds():
             entry = self.entries[id]
             if not entry["downloaded"]:
@@ -350,7 +372,7 @@ class ArchivedArticles(Feed):
                     html = f.read()
                     f.close()
                     soup = BeautifulSoup(html)
-                    images = soup.body('img')
+                    images = soup('img')
                     baseurl = ''.join(urlparse(entry["link"])[:-1])
                     for img in images:
                         filename = self.imageHandler.addImage(self.uniqueId, baseurl, img['src'])
@@ -476,16 +498,16 @@ class Listing:
                     feed = Feed(getId(title), title, url, self.imageHandler)
             return feed
         
-    def updateFeeds(self, expiryTime=24, proxy=None):
+    def updateFeeds(self, expiryTime=24, proxy=None, imageCache=False):
         for key in self.getListOfFeeds():
             feed = self.loadFeed(key)
-            feed.updateFeed(self.configdir, expiryTime, proxy)
+            feed.updateFeed(self.configdir, expiryTime, proxy, imageCache)
             self.listOfFeeds[key]["unread"] = feed.getNumberOfUnreadItems()
             self.listOfFeeds[key]["updateTime"] = feed.getUpdateTime()
             
-    def updateFeed(self, key, expiryTime=24, proxy=None):
+    def updateFeed(self, key, expiryTime=24, proxy=None, imageCache=False):
         feed = self.getFeed(key)
-        feed.updateFeed(self.configdir, expiryTime, proxy)
+        feed.updateFeed(self.configdir, expiryTime, proxy, imageCache)
         self.listOfFeeds[key]["unread"] = feed.getNumberOfUnreadItems()
         self.listOfFeeds[key]["updateTime"] = feed.getUpdateTime()
         
