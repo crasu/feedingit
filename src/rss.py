@@ -130,12 +130,14 @@ class Feed:
             tmp=feedparser.parse(self.url)
         else:
             tmp=feedparser.parse(self.url, handlers = [proxy])
+        expiry = float(expiryTime) * 3600.
         # Check if the parse was succesful (number of entries > 0, else do nothing)
         if len(tmp["entries"])>0:
            #reversedEntries = self.getEntries()
            #reversedEntries.reverse()
            if not isdir(configdir+self.uniqueId+".d"):
                mkdir(configdir+self.uniqueId+".d")
+           currentTime = time.time()
            tmpEntries = {}
            tmpIds = []
            for entry in tmp["entries"]:
@@ -143,56 +145,63 @@ class Feed:
                tmpEntry = {"title":entry["title"], "content":self.extractContent(entry),
                             "date":date, "dateTuple":dateTuple, "link":entry["link"], "images":[] }
                id = self.generateUniqueId(tmpEntry)
+               
+               #articleTime = time.mktime(self.entries[id]["dateTuple"])
                if not id in self.ids:
-                   
-                   soup = BeautifulSoup(tmpEntry["content"])
+                   soup = BeautifulSoup(self.getArticle(tmpEntry)) #tmpEntry["content"])
                    images = soup('img')
                    baseurl = ''.join(urlparse(tmpEntry["link"])[:-1])
                    if imageCache:
-                        for img in images:
+                      for img in images:
+                          try:
                             filename = self.imageHandler.addImage(self.uniqueId, baseurl, img['src'])
                             img['src']=filename
                             tmpEntry["images"].append(filename)
+                          except:
+                              print "Error downloading image %s" %img
                    tmpEntry["contentLink"] = configdir+self.uniqueId+".d/"+id+".html"
                    file = open(tmpEntry["contentLink"], "w")
                    file.write(soup.prettify())
                    file.close()
                    tmpEntries[id] = tmpEntry
                    tmpIds.append(id)
+                   if id not in self.readItems:
+                       self.readItems[id] = False
+               else:
+                    tmpEntries[id] = self.entries[id]
+                    tmpIds.append(id)
             
-           for entryId in self.getIds()[:]:
-                currentTime = time.time()
-                expiry = float(expiryTime) * 3600.
-                try:
-                    articleTime = time.mktime(self.entries[entryId]["dateTuple"])
-                    if currentTime - articleTime < expiry:
-                       tmpEntries[entryId] = self.entries[entryId]
-                       tmpIds.append(entryId)
-                    else:
-                        if (not self.isEntryRead(entryId)) and (currentTime - articleTime < 2*expiry):
-                            tmpEntries[entryId] = self.entries[entryId]
-                            tmpIds.append(entryId)
-                        else:
-                            self.removeEntry(id)
-                except:
-                    self.removeEntry(id)
-                    print "Error purging old articles %s" % id
-                    
-                   
+           oldIds = self.ids[:]
+           for entryId in oldIds:
+                if not entryId in tmpIds:
+                    try:
+                        articleTime = time.mktime(self.entries[entryId]["dateTuple"])
+                        if (currentTime - articleTime > 2*expiry):
+                            self.removeEntry(entryId)
+                            continue
+                        if (currentTime - articleTime > expiry) and (self.isEntryRead(entryId)):
+                            # Entry is over 24 hours, and already read
+                            self.removeEntry(entryId)
+                            continue
+                        tmpEntries[entryId] = self.entries[entryId]
+                        tmpIds.append(entryId)
+                    except:
+                        print "Error purging old articles %s" % entryId
+                        self.removeEntry(entryId)
+
            self.entries = tmpEntries
            self.ids = tmpIds
-           self.countUnread = 0
-           # Initialize the new articles to unread
-           tmpReadItems = self.readItems
-           self.readItems = {}
-           for id in self.getIds():
-               if not tmpReadItems.has_key(id):
+           tmpUnread = 0
+           
+
+           ids = self.ids[:]
+           for id in ids:
+               if not self.readItems.has_key(id):
                    self.readItems[id] = False
-               else:
-                   self.readItems[id] = tmpReadItems[id]
                if self.readItems[id]==False:
-                  self.countUnread = self.countUnread + 1
+                  tmpUnread = tmpUnread + 1
            del tmp
+           self.countUnread = tmpUnread
            self.updateTime = time.asctime()
            self.saveFeed(configdir)
 
@@ -320,9 +329,9 @@ class Feed:
         #except:
         #    print "Error removing entry %s" %id
     
-    def getArticle(self, id):
-        self.setEntryRead(id)
-        entry = self.entries[id]
+    def getArticle(self, entry):
+        #self.setEntryRead(id)
+        #entry = self.entries[id]
         title = entry['title']
         #content = entry.get('content', entry.get('summary_detail', {}))
         content = entry["content"]
@@ -465,7 +474,7 @@ class Listing:
     def addArchivedArticle(self, key, index):
         feed = self.getFeed(key)
         title = feed.getTitle(index)
-        link = feed.getLink(index)
+        link = feed.getExternalLink(index)
         date = feed.getDateTuple(index)
         if not self.listOfFeeds.has_key("ArchivedArticles"):
             self.listOfFeeds["ArchivedArticles"] = {"title":"Archived Articles", "url":"", "unread":0, "updateTime":"Never"}

@@ -43,3 +43,7 @@ class ServerObject(dbus.service.Object):
     @dbus.service.method('org.maemo.feedingit')
     def GetStatus(self):
         return self.app.getStatus()
+    
+    def Update(self):
+        self.app.button_update_clicked(None, None)
+        return "Done"

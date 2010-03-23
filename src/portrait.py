@@ -53,7 +53,7 @@ class FremantleRotation(object):
     _MCE_REQUEST_PATH = '/com/nokia/mce/request'
     _MCE_REQUEST_IF = 'com.nokia.mce.request'
 
-    def __init__(self, app_name, main_window=None, version='1.0', mode=0):
+    def __init__(self, app_name, main_window=None, version='1.0', mode=0, app=None):
         """Create a new rotation manager
 
         app_name    ... The name of your application (for osso.Context)
@@ -65,6 +65,7 @@ class FremantleRotation(object):
         self._main_window = main_window
         self._stack = hildon.WindowStack.get_default()
         self._mode = -1
+        self.app = app
         app_id = '-'.join((app_name, self.__class__.__name__))
         self._osso_context = osso.Context(app_id, version, False)
         self._last_dbus_orientation = self._get_current_orientation()
@@ -170,6 +171,12 @@ class FremantleRotation(object):
             hildon.hildon_gtk_window_set_portrait_flags(window, flags)
 
         self._orientation = orientation
+        if orientation == self._PORTRAIT:
+            try:
+                self.app.disp.clear()
+                self.app.disp.displayFeed()
+            except:
+                pass
 
     def _on_orientation_signal(self, orientation, stand, face, x, y, z):            
         if orientation in (self._PORTRAIT, self._LANDSCAPE):

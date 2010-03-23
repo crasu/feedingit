@@ -370,11 +370,11 @@ class SortList(gtk.Dialog):
                
 
 class DisplayArticle(hildon.StackableWindow):
-    def __init__(self, feed, id, key, config):
+    def __init__(self, feed, id, key, config, listing):
         hildon.StackableWindow.__init__(self)
         #self.imageDownloader = ImageDownloader()
         self.feed = feed
-        #self.listing=listing
+        self.listing=listing
         self.key = key
         self.id = id
         self.set_title(feed.getTitle(id))
@@ -400,6 +400,8 @@ class DisplayArticle(hildon.StackableWindow):
         self.feed.setEntryRead(self.id)
         #if key=="ArchivedArticles":
         self.view.open("file://" + contentLink)
+        self.view.connect("motion-notify-event", lambda w,ev: True)
+
         #else:
         #self.view.load_html_string(self.text, contentLink) # "text/html", "utf-8", self.link)
         self.view.set_zoom_level(float(config.getArtFontSize())/10.)
@@ -497,10 +499,10 @@ class DisplayArticle(hildon.StackableWindow):
     #    self.show_all()
 
     def _signal_link_clicked(self, object, link):
-        bus = dbus.SystemBus()
+        bus = dbus.SessionBus()
         proxy = bus.get_object("com.nokia.osso_browser", "/com/nokia/osso_browser/request")
         iface = dbus.Interface(proxy, 'com.nokia.osso_browser')
-        iface.load_url(link)
+        iface.open_new_window(link)
 
     #def _signal_request_url(self, object, url, stream):
         #print url
@@ -585,11 +587,12 @@ class DisplayFeed(hildon.StackableWindow):
         self.show_all()
         
     def clear(self):
-        self.remove(self.pannableFeed)
+        self.pannableFeed.destroy()
+        #self.remove(self.pannableFeed)
 
     def button_clicked(self, button, index, previous=False, next=False):
         #newDisp = DisplayArticle(self.feedTitle, self.feed.getArticle(index), self.feed.getLink(index), index, self.key, self.listing, self.config)
-        newDisp = DisplayArticle(self.feed, index, self.key, self.config)
+        newDisp = DisplayArticle(self.feed, index, self.key, self.config, self.listing)
         stack = hildon.WindowStack.get_default()
         if previous:
             tmp = stack.peek()
@@ -695,8 +698,8 @@ class FeedingIt:
         self.listing = Listing(CONFIGDIR)
         
         self.downloadDialog = False
-        #self.orientation = FremantleRotation("FeedingIt", main_window=self.window)
-        #self.orientation.set_mode(self.config.getOrientation())
+        self.orientation = FremantleRotation("FeedingIt", main_window=self.window, app=self)
+        self.orientation.set_mode(self.config.getOrientation())
         
         menu = hildon.AppMenu()
         # Create a button and add it to the menu
@@ -843,8 +846,8 @@ class FeedingIt:
                 break
 
     def buttonFeedClicked(widget, button, self, window, key):
-        disp = DisplayFeed(self.listing, self.listing.getFeed(key), self.listing.getFeedTitle(key), key, self.config)
-        disp.connect("feed-closed", self.onFeedClosed)
+        self.disp = DisplayFeed(self.listing, self.listing.getFeed(key), self.listing.getFeedTitle(key), key, self.config)
+        self.disp.connect("feed-closed", self.onFeedClosed)
 
     def onFeedClosed(self, object, key):
         #self.displayListing()
