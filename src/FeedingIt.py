@@ -743,6 +743,10 @@ class FeedingIt:
         self.autoupdate = False
         self.checkAutoUpdate()
         hildon.hildon_gtk_window_set_progress_indicator(self.window, 0)
+        gobject.idle_add(self.enabelDbus)
+        
+    def enableDbus(self):
+        dbusHandler = ServerObject(self)
 
     def button_markAll(self, button):
         for key in self.listing.getListOfFeeds():
@@ -914,5 +918,4 @@ if __name__ == "__main__":
             print "Error: Can't create configuration directory"
             sys.exit(1)
     app = FeedingIt()
-    dbusHandler = ServerObject(app)
     app.run()

@@ -171,12 +171,12 @@ class FremantleRotation(object):
             hildon.hildon_gtk_window_set_portrait_flags(window, flags)
 
         self._orientation = orientation
-        if orientation == self._PORTRAIT:
-            try:
-                self.app.disp.clear()
-                self.app.disp.displayFeed()
-            except:
-                pass
+        #if orientation == self._PORTRAIT:
+        #    try:
+        #        self.app.disp.clear()
+        #        self.app.disp.displayFeed()
+        #    except:
+        #        pass
 
     def _on_orientation_signal(self, orientation, stand, face, x, y, z):            
         if orientation in (self._PORTRAIT, self._LANDSCAPE):
