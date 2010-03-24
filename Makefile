@@ -14,6 +14,7 @@ install:
 	install src/rss.py ${DESTDIR}/opt/FeedingIt
 	install src/opml.py ${DESTDIR}/opt/FeedingIt
 	install src/config.py ${DESTDIR}/opt/FeedingIt
+	install src/BeautifulSoup.py ${DESTDIR}/opt/FeedingIt
 	install src/feedingitdbus.py ${DESTDIR}/opt/FeedingIt
 	install -d ${DESTDIR}/usr/share/applications/hildon
 	install src/FeedingIt.desktop ${DESTDIR}/usr/share/applications/hildon
