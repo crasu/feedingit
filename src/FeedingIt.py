@@ -19,7 +19,7 @@
 # ============================================================================
 # Name        : FeedingIt.py
 # Author      : Yves Marcoz
-# Version     : 0.5.2
+# Version     : 0.5.4
 # Description : Simple RSS Reader
 # ============================================================================
 
@@ -56,7 +56,8 @@ timeout = 5
 socket.setdefaulttimeout(timeout)
 
 color_style = gtk.rc_get_style_by_paths(gtk.settings_get_default() , 'GtkButton', 'osso-logical-colors', gtk.Button)
-fg_color = color_style.lookup_color('ActiveTextColor')
+unread_color = color_style.lookup_color('ActiveTextColor')
+read_color = color_style.lookup_color('DefaultTextColor')
 del color_style
 
 CONFIGDIR="/home/user/.feedingit/"
@@ -236,27 +237,27 @@ class SortList(gtk.Dialog):
         
         self.vbox2 = gtk.VBox(False, 10)
         
-        button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
+        button = hildon.GtkButton(gtk.HILDON_SIZE_FINGER_HEIGHT)
         button.set_label("Move Up")
         button.connect("clicked", self.buttonUp)
         self.vbox2.pack_start(button, expand=False, fill=False)
         
-        button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
+        button = hildon.GtkButton(gtk.HILDON_SIZE_FINGER_HEIGHT)
         button.set_label("Move Down")
         button.connect("clicked", self.buttonDown)
         self.vbox2.pack_start(button, expand=False, fill=False)
 
-        button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
+        button = hildon.GtkButton(gtk.HILDON_SIZE_FINGER_HEIGHT)
         button.set_label("Add Feed")
         button.connect("clicked", self.buttonAdd)
         self.vbox2.pack_start(button, expand=False, fill=False)
 
-        button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
+        button = hildon.GtkButton(gtk.HILDON_SIZE_FINGER_HEIGHT)
         button.set_label("Edit Feed")
         button.connect("clicked", self.buttonEdit)
         self.vbox2.pack_start(button, expand=False, fill=False)
         
-        button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
+        button = hildon.GtkButton(gtk.HILDON_SIZE_FINGER_HEIGHT)
         button.set_label("Delete")
         button.connect("clicked", self.buttonDelete)
         self.vbox2.pack_start(button, expand=False, fill=False)
@@ -566,15 +567,11 @@ class DisplayFeed(hildon.StackableWindow):
             if self.feed.isEntryRead(id):
                 #label.modify_font(pango.FontDescription("sans 16"))
                 label.modify_font(pango.FontDescription(self.config.getReadFont()))
-                label.modify_fg(gtk.STATE_NORMAL, gtk.gdk.color_parse("white"))
+                label.modify_fg(gtk.STATE_NORMAL, read_color) # gtk.gdk.color_parse("white"))
             else:
                 #print self.listing.getFont() + " bold"
                 label.modify_font(pango.FontDescription(self.config.getUnreadFont()))
-                #label.modify_fg(gtk.STATE_NORMAL, gtk.gdk.color_parse("SkyBlue"))
-                #fg_color = fg_button.child.get_children()[0].get_children()[0].get_children()[1].get_style().fg[gtk.STATE_NORMAL]
-                label.modify_fg(gtk.STATE_NORMAL, fg_color)
-                #label.modify_font(pango.FontDescription("sans bold 23"))
-                #"sans bold 16"
+                label.modify_fg(gtk.STATE_NORMAL, unread_color)
             label.set_line_wrap(True)
             
             label.set_size_request(self.get_size()[0]-50, -1)
@@ -601,25 +598,11 @@ class DisplayFeed(hildon.StackableWindow):
             gobject.timeout_add(200, self.destroyArticle, tmp)
             #print "previous"
             self.disp = newDisp
-            
-            #stack.push(tmp)
-            #if not self.disp == False:
-            #   self.disp.destroyWindow()
         elif next:
-            #print type(self.disp).__name__
-
-                #self.disp.destroyWindow()
-                #stack.pop_and_push(1,newDisp)
-            #else:
-            #    stack.push(newDisp)
-            #self.disp = newDisp
             newDisp.show_all()
             if type(self.disp).__name__ == "DisplayArticle":
                 gobject.timeout_add(200, self.destroyArticle, self.disp)
             self.disp = newDisp
-            #self.disp.show_all()
-            #if not self.disp == False:
-            #    self.disp.destroyWindow()
         else:
             self.disp = newDisp
             self.disp.show_all()
@@ -635,21 +618,21 @@ class DisplayFeed(hildon.StackableWindow):
     def nextArticle(self, object, index):
         label = self.buttons[index].child
         label.modify_font(pango.FontDescription(self.config.getReadFont()))
-        label.modify_fg(gtk.STATE_NORMAL, gtk.gdk.color_parse("white"))
+        label.modify_fg(gtk.STATE_NORMAL, read_color) #  gtk.gdk.color_parse("white"))
         id = self.feed.getNextId(index)
         self.button_clicked(object, id, next=True)
 
     def previousArticle(self, object, index):
         label = self.buttons[index].child
         label.modify_font(pango.FontDescription(self.config.getReadFont()))
-        label.modify_fg(gtk.STATE_NORMAL, gtk.gdk.color_parse("white"))
+        label.modify_fg(gtk.STATE_NORMAL, read_color) # gtk.gdk.color_parse("white"))
         id = self.feed.getPreviousId(index)
         self.button_clicked(object, id, previous=True)
 
     def onArticleClosed(self, object, index):
         label = self.buttons[index].child
         label.modify_font(pango.FontDescription(self.config.getReadFont()))
-        label.modify_fg(gtk.STATE_NORMAL, gtk.gdk.color_parse("white"))
+        label.modify_fg(gtk.STATE_NORMAL, read_color) # gtk.gdk.color_parse("white"))
         self.buttons[index].show()
 
     def button_update_clicked(self, button):
@@ -667,16 +650,13 @@ class DisplayFeed(hildon.StackableWindow):
         self.vbox.destroy()
         self.feed = self.listing.getFeed(self.key)
         self.displayFeed()
-        #self.feed.updateFeed()
-    #    self.clear()
-    #    self.displayFeed()
         
     def buttonReadAllClicked(self, button):
         for index in self.feed.getIds():
             self.feed.setEntryRead(index)
             label = self.buttons[index].child
             label.modify_font(pango.FontDescription(self.config.getReadFont()))
-            label.modify_fg(gtk.STATE_NORMAL, gtk.gdk.color_parse("white"))
+            label.modify_fg(gtk.STATE_NORMAL, read_color) # gtk.gdk.color_parse("white"))
             self.buttons[index].show()
 
 
@@ -743,7 +723,7 @@ class FeedingIt:
         self.autoupdate = False
         self.checkAutoUpdate()
         hildon.hildon_gtk_window_set_progress_indicator(self.window, 0)
-        gobject.idle_add(self.enabelDbus)
+        gobject.idle_add(self.enableDbus)
         
     def enableDbus(self):
         dbusHandler = ServerObject(self)
@@ -854,18 +834,12 @@ class FeedingIt:
         self.disp.connect("feed-closed", self.onFeedClosed)
 
     def onFeedClosed(self, object, key):
-        #self.displayListing()
         self.listing.saveConfig()
         self.refreshList()
-        #self.buttons[key].set_text(self.listing.getFeedTitle(key), self.listing.getFeedUpdateTime(key) + " / " 
-        #                    + str(self.listing.getFeedNumberOfUnreadItems(key)) + " Unread Items")
-        #self.buttons[key].show()
      
     def run(self):
         self.window.connect("destroy", gtk.main_quit)
         gtk.main()
-        #for key in self.listing.getListOfFeeds():
-        #    self.listing.getFeed(key).saveFeed(CONFIGDIR)
         self.listing.saveConfig()
 
     def prefsClosed(self, *widget):

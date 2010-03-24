@@ -1,3 +1,13 @@
 #!/bin/sh
-cd /opt/FeedingIt
-python2.5 FeedingIt.py
+case "$1" in
+update)
+    dbus-send --print-reply --dest='org.maemo.feedingit' --session /org/maemo/feedingit org.maemo.feedingit.Update
+    ;;
+status)
+    dbus-send --print-reply --dest='org.maemo.feedingit' --session /org/maemo/feedingit org.maemo.feedingit.GetStatus
+    ;;
+*)
+    cd /opt/FeedingIt
+    python2.5 FeedingIt.py
+    ;;
+esac

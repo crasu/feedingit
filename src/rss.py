@@ -19,7 +19,7 @@
 # ============================================================================
 # Name        : FeedingIt.py
 # Author      : Yves Marcoz
-# Version     : 0.5.2
+# Version     : 0.5.4
 # Description : Simple RSS Reader
 # ============================================================================
 
@@ -39,6 +39,21 @@ from urlparse import urlparse
 
 def getId(string):
     return md5.new(string).hexdigest()
+
+def getProxy():
+    import gconf
+    if gconf.client_get_default().get_bool('/system/http_proxy/use_http_proxy'):
+        port = gconf.client_get_default().get_int('/system/http_proxy/port')
+        http = gconf.client_get_default().get_string('/system/http_proxy/host')
+        proxy = proxy = urllib2.ProxyHandler( {"http":"http://%s:%s/"% (http,port)} )
+        return (True, proxy)
+    return (False, None)
+
+# Enable proxy support for images and ArchivedArticles
+(proxy_support, proxy) = getProxy()
+if proxy_support:
+    opener = urllib2.build_opener(proxy)
+    urllib2.install_opener(opener)
 
 # Entry = {"title":XXX, "content":XXX, "date":XXX, "link":XXX, images = [] }
 
@@ -456,20 +471,7 @@ class Listing:
                 self.sortedKeys.remove("font")
             self.sortedKeys.sort(key=lambda obj: self.getFeedTitle(obj))
         list = self.sortedKeys[:]
-        #for key in list:
-        #    try:
-        #        self.loadFeed(key)
-        #    except:
-                #import traceback
-                #if key.startswith('d8'):
-                #traceback.print_exc()
-        #        self.sortedKeys.remove(key)
-            #print key
-                #print key in self.sortedKeys
-        #print "d8eb3f07572892a7b5ed9c81c5bb21a2" in self.sortedKeys
-        #print self.listOfFeeds["d8eb3f07572892a7b5ed9c81c5bb21a2"]
         self.closeCurrentlyDisplayedFeed()
-        #self.saveConfig()
 
     def addArchivedArticle(self, key, index):
         feed = self.getFeed(key)
@@ -553,12 +555,6 @@ class Listing:
     
     def getListOfFeeds(self):
         return self.sortedKeys
-    
-    #def getNumberOfUnreadItems(self, key):
-    #    if self.listOfFeeds.has_key("unread"):
-    #       return self.listOfFeeds[key]["unread"]
-    #    else:
-    #       return 0
     
     def addFeed(self, title, url):
         if not self.listOfFeeds.has_key(getId(title)):

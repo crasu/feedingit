@@ -1,3 +1,12 @@
+feedingit (0.5.4-0) stable; urgency=low
+
+  * Added link to known issues in the Preferences menu
+  * Fixed dbus calls
+  * Changed button size in Organize Feed menu
+  * Added proxy support for image downloads
+ 
+ -- Yves <yves@marcoz.org>  Wed, 23 Mar 2010 20:56:19 -0800
+
 feedingit (0.5.3-4) unstable; urgency=low
 
   * Fixed text selection when panning (#5103)

@@ -19,7 +19,7 @@
 # ============================================================================
 # Name        : FeedingIt.py
 # Author      : Yves Marcoz
-# Version     : 0.4.3
+# Version     : 0.5.4
 # Description : Simple RSS Reader
 # ============================================================================
 
@@ -29,6 +29,8 @@ import ConfigParser
 import gobject
 import gconf
 import urllib2
+
+VERSION = "0.5.4"
 
 section = "FeedingIt"
 ranges = { "updateInterval":[0.5, 1, 2, 4, 12, 24], "expiry":[24, 48, 72], "fontSize":range(12,24), "orientation":["Automatic", "Landscape", "Portrait"], "artFontSize":[10, 12, 14, 16, 18, 20]}
@@ -74,6 +76,13 @@ class Config():
         button.connect("toggled", self.button_toggled, "imageCache")
         vbox.pack_start(button, expand=False)
         
+        button = hildon.Button(gtk.HILDON_SIZE_FINGER_HEIGHT, hildon.BUTTON_ARRANGEMENT_VERTICAL)
+        button.set_label("View Known Issues and Tips")
+        button.connect("clicked", self.button_tips_clicked)
+        button.set_alignment(0,0,1,1)
+        vbox.pack_start(button, expand=False)
+        
+        
         panArea.add_with_viewport(vbox)
         
         self.window.vbox.add(panArea)        
@@ -81,6 +90,13 @@ class Config():
         #self.window.add(self.vbox)
         self.window.show_all()
         return self.window
+
+    def button_tips_clicked(self, *widget):
+        import dbus
+        bus = dbus.SessionBus()
+        proxy = bus.get_object("com.nokia.osso_browser", "/com/nokia/osso_browser/request")
+        iface = dbus.Interface(proxy, 'com.nokia.osso_browser')
+        iface.open_new_window("http://feedingit.marcoz.org/%s.html" % VERSION)
 
     def onExit(self, *widget):
         self.saveConfig()

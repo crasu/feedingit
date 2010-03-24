@@ -19,7 +19,7 @@
 # ============================================================================
 # Name        : FeedingIt.py
 # Author      : Yves Marcoz
-# Version     : 0.4.3
+# Version     : 0.5.4
 # Description : Simple RSS Reader
 # ============================================================================
 
@@ -46,5 +46,5 @@ class ServerObject(dbus.service.Object):
     
     @dbus.service.method('org.maemo.feedingit')
     def Update(self):
-        self.app.button_update_clicked(None, None)
+        self.app.automaticUpdate()
         return "Done"
