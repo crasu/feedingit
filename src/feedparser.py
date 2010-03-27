@@ -2463,6 +2463,8 @@ def parse(url_file_stream_or_string, etag=None, modified=None, agent=None, refer
         result['bozo_exception'] = e
         data = ''
         f = None
+    ## Fix for media:title bug
+    data = data.replace("media:title", "mediatitle")
 
     # if feed is gzip-compressed, decompress it
     if f and data and hasattr(f, 'headers'):

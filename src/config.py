@@ -52,7 +52,7 @@ class Config():
         
         vbox = gtk.VBox(False, 10)
         self.buttons = {}
-        settings = ["fontSize", "expiry", "orientation", "updateInterval",]
+        settings = ["fontSize", "artFontSize", "expiry", "orientation", "updateInterval",]
         for setting in settings:
             picker = hildon.PickerButton(gtk.HILDON_SIZE_FINGER_HEIGHT, hildon.BUTTON_ARRANGEMENT_VERTICAL)
             selector = self.create_selector(ranges[setting], setting)

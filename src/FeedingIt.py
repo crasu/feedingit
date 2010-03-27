@@ -47,6 +47,7 @@ import threading
 import thread
 from feedingitdbus import ServerObject
 from config import Config
+from cgi import escape
 
 from rss import *
 from opml import GetOpmlData, ExportOpmlData
@@ -294,8 +295,8 @@ class SortList(gtk.Dialog):
         #self.show_all()
 
     def refreshList(self, selected=None, offset=0):
-        rect = self.treeview.get_visible_rect()
-        y = rect.y+rect.height
+        #rect = self.treeview.get_visible_rect()
+        #y = rect.y+rect.height
         self.treestore = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
         for key in self.listing.getListOfFeeds():
             item = self.treestore.append([self.listing.getFeedTitle(key), key])
@@ -378,7 +379,8 @@ class DisplayArticle(hildon.StackableWindow):
         self.listing=listing
         self.key = key
         self.id = id
-        self.set_title(feed.getTitle(id))
+        #self.set_title(feed.getTitle(id))
+        self.set_title(self.listing.getFeedTitle(key))
         self.config = config
         
         # Init the article display
@@ -457,7 +459,7 @@ class DisplayArticle(hildon.StackableWindow):
         x = self.coords[0] - event.x
         y = self.coords[1] - event.y
         
-        if (abs(y) < 30):
+        if (2*abs(y) < abs(x)):
             if (x > 15):
                 self.emit("article-previous", self.id)
             elif (x<-15):
@@ -561,7 +563,9 @@ class DisplayFeed(hildon.StackableWindow):
         self.pannableFeed.set_property("mov-mode", hildon.MOVEMENT_MODE_BOTH)
         self.buttons = {}
         for id in self.feed.getIds():
-            button = gtk.Button(self.feed.getTitle(id))
+            title = self.feed.getTitle(id)
+            esc_title = title.replace("<em>","").replace("</em>","").replace("&amp;","&")
+            button = gtk.Button(esc_title)
             button.set_alignment(0,0)
             label = button.child
             if self.feed.isEntryRead(id):
@@ -807,10 +811,11 @@ class FeedingIt:
         #list.reverse()
         for key in list:
             #button = gtk.Button(item)
+            unreadItems = self.listing.getFeedNumberOfUnreadItems(key)
             button = hildon.Button(gtk.HILDON_SIZE_AUTO_WIDTH | gtk.HILDON_SIZE_FINGER_HEIGHT,
                               hildon.BUTTON_ARRANGEMENT_VERTICAL)
             button.set_text(self.listing.getFeedTitle(key), self.listing.getFeedUpdateTime(key) + " / " 
-                            + str(self.listing.getFeedNumberOfUnreadItems(key)) + " Unread Items")
+                            + str(unreadItems) + " Unread Items")
             button.set_alignment(0,0,1,1)
             button.connect("clicked", self.buttonFeedClicked, self, self.window, key)
             self.vboxListing.pack_start(button, expand=False)
@@ -818,13 +823,20 @@ class FeedingIt:
      
         self.mainVbox.pack_start(self.pannableListing)
         self.window.show_all()
+        gobject.idle_add(self.refreshList)
 
     def refreshList(self):
         for key in self.listing.getListOfFeeds():
             if self.buttons.has_key(key):
                 button = self.buttons[key]
+                unreadItems = self.listing.getFeedNumberOfUnreadItems(key)
                 button.set_text(self.listing.getFeedTitle(key), self.listing.getFeedUpdateTime(key) + " / " 
-                            + str(self.listing.getFeedNumberOfUnreadItems(key)) + " Unread Items")
+                            + str(unreadItems) + " Unread Items")
+                label = button.child.child.get_children()[0].get_children()[1]
+                if unreadItems == 0:
+                    label.modify_fg(gtk.STATE_NORMAL, read_color)
+                else:
+                    label.modify_fg(gtk.STATE_NORMAL, unread_color)
             else:
                 self.displayListing()
                 break
