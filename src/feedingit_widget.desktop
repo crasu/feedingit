@@ -1,0 +1,5 @@
+[Desktop Entry]
+Name=FeedingIt
+Comment=FeedingIt RSS Widget
+Type=python
+X-Path=feedingit_widget.py

@@ -28,6 +28,12 @@ install:
 	install src/feedingit.service ${DESTDIR}/usr/share/dbus-1/services/
 	install -d ${DESTDIR}/etc/osso-backup/applications/
 	install src/feedingit.conf ${DESTDIR}/etc/osso-backup/applications/
+	install -d ${DESTDIR}/usr/share/applications/hildon-home/
+	install src/feedingit_widget.desktop ${DESTDIR}/usr/share/applications/hildon-home/
+	install -d ${DESTDIR}/usr/lib/hildon-desktop/
+	install src/feedingit_widget.py ${DESTDIR}/usr/lib/hildon-desktop/
+	
+	
 	
 clean:
 	rm src/*pyo

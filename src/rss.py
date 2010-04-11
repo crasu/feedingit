@@ -455,11 +455,11 @@ class Listing:
             file.close()
         else:
             self.listOfFeeds = {getId("Slashdot"):{"title":"Slashdot", "url":"http://rss.slashdot.org/Slashdot/slashdot", "unread":0, "updateTime":"Never"}, }
-        if isfile(self.configdir+"images.pickle"):
+        try:
             file = open(self.configdir+"images.pickle")
             self.imageHandler = pickle.load(file)
             file.close()
-        else:
+        except:
             self.imageHandler = ImageHandler(self.configdir)
         if self.listOfFeeds.has_key("font"):
             del self.listOfFeeds["font"]

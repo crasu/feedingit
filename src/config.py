@@ -183,9 +183,9 @@ class Config():
     def getUpdateInterval(self):
         return float(self.config["updateInterval"])
     def getReadFont(self):
-        return "sans %s" % self.config["fontSize"]
+        return "sans italic %s" % self.config["fontSize"]
     def getUnreadFont(self):
-        return "sans bold %s" % self.config["fontSize"]
+        return "sans %s" % self.config["fontSize"]
     def getOrientation(self):
         return ranges["orientation"].index(self.config["orientation"])
     def getImageCache(self):

@@ -404,6 +404,8 @@ class DisplayArticle(hildon.StackableWindow):
         #if key=="ArchivedArticles":
         self.view.open("file://" + contentLink)
         self.view.connect("motion-notify-event", lambda w,ev: True)
+        self.view.connect('load-started', self.load_started)
+        self.view.connect('load-finished', self.load_finished)
 
         #else:
         #self.view.load_html_string(self.text, contentLink) # "text/html", "utf-8", self.link)
@@ -450,6 +452,12 @@ class DisplayArticle(hildon.StackableWindow):
         self.view.connect("button_press_event", self.button_pressed)
         self.gestureId = self.view.connect("button_release_event", self.button_released)
         #self.timeout_handler_id = gobject.timeout_add(300, self.reloadArticle)
+
+    def load_started(self, *widget):
+        hildon.hildon_gtk_window_set_progress_indicator(self, 1)
+        
+    def load_finished(self, *widget):
+        hildon.hildon_gtk_window_set_progress_indicator(self, 0)
 
     def button_pressed(self, window, event):
         #print event.x, event.y
@@ -564,7 +572,7 @@ class DisplayFeed(hildon.StackableWindow):
         self.buttons = {}
         for id in self.feed.getIds():
             title = self.feed.getTitle(id)
-            esc_title = title.replace("<em>","").replace("</em>","").replace("&amp;","&")
+            esc_title = title.replace("<em>","").replace("</em>","").replace("&amp;","&").replace("&mdash;", "-").replace("&#8217;", "'")
             button = gtk.Button(esc_title)
             button.set_alignment(0,0)
             label = button.child
@@ -730,7 +738,7 @@ class FeedingIt:
         gobject.idle_add(self.enableDbus)
         
     def enableDbus(self):
-        dbusHandler = ServerObject(self)
+        self.dbusHandler = ServerObject(self)
 
     def button_markAll(self, button):
         for key in self.listing.getListOfFeeds():
@@ -781,6 +789,7 @@ class FeedingIt:
         self.downloadDialog = False
         #self.displayListing()
         self.refreshList()
+        self.dbusHandler.ArticleCountUpdated()
 
     def button_preferences_clicked(self, button):
         dialog = self.config.createDialog()
@@ -848,6 +857,7 @@ class FeedingIt:
     def onFeedClosed(self, object, key):
         self.listing.saveConfig()
         self.refreshList()
+        self.dbusHandler.ArticleCountUpdated()
      
     def run(self):
         self.window.connect("destroy", gtk.main_quit)

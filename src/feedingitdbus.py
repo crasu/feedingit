@@ -48,3 +48,13 @@ class ServerObject(dbus.service.Object):
     def Update(self):
         self.app.automaticUpdate()
         return "Done"
+
+    @dbus.service.method('org.maemo.feedingit')
+    def OpenFeed(self, key):
+        self.app.buttonFeedClicked(None, self.app, None, key)
+        return "Done"    
+
+    # A signal that will be exported to dbus
+    @dbus.service.signal('org.maemo.feedingit', signature='')
+    def ArticleCountUpdated(self):
+        pass

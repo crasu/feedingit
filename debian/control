@@ -10,7 +10,8 @@ XSBC-Bugtracker: https://garage.maemo.org/tracker/?func=browse&group_id=1202&ati
 Package: feedingit
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, python, python-hildon,
- python-dbus, python-osso, python-gconf, python2.5-webkit
+ python-dbus, python-osso, python-gconf, python2.5-webkit,
+ python-hildondesktop, hildon-desktop-python-loader
 Description:
  RSS Reader
  Its main features are:
