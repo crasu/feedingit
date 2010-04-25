@@ -1,11 +1,16 @@
 #!/bin/sh
 case "$1" in
 update)
-    dbus-send --print-reply --dest='org.maemo.feedingit' --session /org/maemo/feedingit org.maemo.feedingit.Update
+    dbus-send --print-reply --dest='org.marcoz.feedingit' --session /org/marcoz/feedingit/update org.marcoz.feedingit.UpdateAll
     ;;
 status)
     dbus-send --print-reply --dest='org.maemo.feedingit' --session /org/maemo/feedingit org.maemo.feedingit.GetStatus
     ;;
+dbus)
+	cd /opt/FeedingIt
+	#cp feedingit_status.desktop /usr/share/applications/hildon-status-menu/
+	python2.5 update_feeds.py
+	;;
 *)
     cd /opt/FeedingIt
     python2.5 FeedingIt.py

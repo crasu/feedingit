@@ -1,5 +1,4 @@
 #!/usr/bin/env python2.5
-
 # 
 # Copyright (c) 2007-2008 INdT.
 # This program is free software: you can redistribute it and/or modify
@@ -19,32 +18,23 @@
 # ============================================================================
 # Name        : FeedingIt.py
 # Author      : Yves Marcoz
-# Version     : 0.5.4
+# Version     : 0.6.1
 # Description : Simple RSS Reader
 # ============================================================================
 
-import dbus
-import dbus.service
+import gtk
+import hildondesktop
 
-class ServerObject(dbus.service.Object):
-    def __init__(self, app):
-        # Here the service name
-        bus_name = dbus.service.BusName('org.maemo.feedingit',bus=dbus.SessionBus())
-        # Here the object path
-        dbus.service.Object.__init__(self, bus_name, '/org/maemo/feedingit')
-        self.app = app
+class FeedingItStatusPlugin(hildondesktop.StatusMenuItem):
+    def __init__(self):
+        hildondesktop.StatusMenuItem.__init__(self)
 
-    # Here the interface name, and the method is named same as on dbus.
-    @dbus.service.method('org.maemo.feedingit')
-    def AddFeed(self, url):
-        self.app.addFeed(url)
-        return "Done"
-    
-    @dbus.service.method('org.maemo.feedingit')
-    def GetStatus(self):
-        return self.app.getStatus()
+        icon_theme = gtk.icon_theme_get_default()
+        pixbuf = icon_theme.load_icon("feedingit", 22, gtk.ICON_LOOKUP_NO_SVG)
+        self.set_status_area_icon(pixbuf)
 
-    @dbus.service.method('org.maemo.feedingit')
-    def OpenFeed(self, key):
-        self.app.buttonFeedClicked(None, self.app, None, key)
-        return "Done"
+        label = gtk.Label("Example message")
+        self.add(label)
+        self.show_all()
+
+hd_plugin_type = FeedingItStatusPlugin

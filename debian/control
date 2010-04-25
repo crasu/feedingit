@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: Yves <yves@marcoz.org>
 Build-Depends: debhelper (>= 5)
 Standards-Version: 3.7.2
-XB-Maemo-Display-Name: FeedingIt                                                                                                                      
+XB-Maemo-Display-Name: FeedingIt RSS Reader
 XSBC-Bugtracker: https://garage.maemo.org/tracker/?func=browse&group_id=1202&atid=4512
 
 Package: feedingit
@@ -14,11 +14,9 @@ Depends: ${shlibs:Depends}, ${misc:Depends}, python, python-hildon,
  python-hildondesktop, hildon-desktop-python-loader
 Description:
  RSS Reader
- Its main features are:
- - Portrait mode support
- - Auto-update
- - Swipe left or right while in articles to move to the previous or next article
- - Import/Export of OPML files
+ Its main features are portrait mode support, auto-update, swipe left or right while
+ in articles to move to the previous or next article, import/export of OPML files,
+ image caching, desktop widget
 XB-Maemo-Icon-26:
  iVBORw0KGgoAAAANSUhEUgAAABoAAAAaCAYAAACpSkzOAAAAAXNSR0IArs4c                                                                                                                                     
  6QAAAAZiS0dEAP8A/wD/oL2nkwAAAAlwSFlzAAALEwAACxMBAJqcGAAABl1J

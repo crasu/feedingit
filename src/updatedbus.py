@@ -19,32 +19,50 @@
 # ============================================================================
 # Name        : FeedingIt.py
 # Author      : Yves Marcoz
-# Version     : 0.5.4
+# Version     : 0.6.1
 # Description : Simple RSS Reader
 # ============================================================================
 
 import dbus
 import dbus.service
 
-class ServerObject(dbus.service.Object):
+def get_lock(key):
+    try:
+        bus_name = dbus.service.BusName('org.marcoz.feedingit.lock_%s' %key,bus=dbus.SessionBus(), do_not_queue=True)
+    except:
+        bus_name = None
+    return bus_name
+    
+
+class UpdateServerObject(dbus.service.Object):
     def __init__(self, app):
         # Here the service name
-        bus_name = dbus.service.BusName('org.maemo.feedingit',bus=dbus.SessionBus())
+        bus_name = dbus.service.BusName('org.marcoz.feedingit',bus=dbus.SessionBus())
         # Here the object path
-        dbus.service.Object.__init__(self, bus_name, '/org/maemo/feedingit')
+        dbus.service.Object.__init__(self, bus_name, '/org/marcoz/feedingit/update')
         self.app = app
 
-    # Here the interface name, and the method is named same as on dbus.
-    @dbus.service.method('org.maemo.feedingit')
-    def AddFeed(self, url):
-        self.app.addFeed(url)
+    @dbus.service.method('org.marcoz.feedingit')
+    def UpdateAll(self):
+        self.app.automaticUpdate()
         return "Done"
     
-    @dbus.service.method('org.maemo.feedingit')
-    def GetStatus(self):
-        return self.app.getStatus()
-
-    @dbus.service.method('org.maemo.feedingit')
-    def OpenFeed(self, key):
-        self.app.buttonFeedClicked(None, self.app, None, key)
+    @dbus.service.method('org.marcoz.feedingit')
+    def StopUpdate(self):
+        self.app.stopUpdate()
         return "Done"
+    
+    # A signal that will be exported to dbus
+    @dbus.service.signal('org.marcoz.feedingit', signature='')
+    def ArticleCountUpdated(self):
+        pass
+
+    # A signal that will be exported to dbus
+    @dbus.service.signal('org.marcoz.feedingit', signature='')
+    def UpdateStarted(self):
+        pass
+    
+    # A signal that will be exported to dbus
+    @dbus.service.signal('org.marcoz.feedingit', signature='')
+    def UpdateFinished(self):
+        pass

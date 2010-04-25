@@ -19,42 +19,37 @@
 # ============================================================================
 # Name        : FeedingIt.py
 # Author      : Yves Marcoz
-# Version     : 0.5.4
+# Version     : 0.6.0
 # Description : Simple RSS Reader
 # ============================================================================
 
 import gtk
-import feedparser
-import pango
+from pango import FontDescription
 import hildon
 #import gtkhtml2
 #try:
-import webkit
+from webkit import WebView
 #    has_webkit=True
 #except:
 #    import gtkhtml2
 #    has_webkit=False
-import time
-import dbus
-import pickle
-from os.path import isfile, isdir
-from os import mkdir
-import sys   
-import urllib2
+from os.path import isfile, isdir, exists
+from os import mkdir, remove, stat
 import gobject
 from portrait import FremantleRotation
-import threading
-import thread
+from threading import Thread, activeCount
 from feedingitdbus import ServerObject
+from updatedbus import UpdateServerObject, get_lock
 from config import Config
 from cgi import escape
 
-from rss import *
+from rss import Listing
 from opml import GetOpmlData, ExportOpmlData
-   
-import socket
+
+from socket import setdefaulttimeout
 timeout = 5
-socket.setdefaulttimeout(timeout)
+setdefaulttimeout(timeout)
+del timeout
 
 color_style = gtk.rc_get_style_by_paths(gtk.settings_get_default() , 'GtkButton', 'osso-logical-colors', gtk.Button)
 unread_color = color_style.lookup_color('ActiveTextColor')
@@ -62,6 +57,38 @@ read_color = color_style.lookup_color('DefaultTextColor')
 del color_style
 
 CONFIGDIR="/home/user/.feedingit/"
+LOCK = CONFIGDIR + "update.lock"
+
+from re import sub
+from htmlentitydefs import name2codepoint
+
+##
+# Removes HTML or XML character references and entities from a text string.
+#
+# @param text The HTML (or XML) source text.
+# @return The plain text, as a Unicode string, if necessary.
+# http://effbot.org/zone/re-sub.htm#unescape-html
+def unescape(text):
+    def fixup(m):
+        text = m.group(0)
+        if text[:2] == "&#":
+            # character reference
+            try:
+                if text[:3] == "&#x":
+                    return unichr(int(text[3:-1], 16))
+                else:
+                    return unichr(int(text[2:-1]))
+            except ValueError:
+                pass
+        else:
+            # named entity
+            try:
+                text = unichr(name2codepoint[text[1:-1]])
+            except KeyError:
+                pass
+        return text # leave as is
+    return sub("&#?\w+;", fixup, text)
+
 
 class AddWidgetWizard(hildon.WizardDialog):
     
@@ -121,92 +148,52 @@ class AddWidgetWizard(hildon.WizardDialog):
             return False
         else:
             return True
-
-#class GetImage(threading.Thread):
-#    def __init__(self, url, stream):
-#        threading.Thread.__init__(self)
-#        self.url = url
-#        self.stream = stream
-#    
-#    def run(self):
-#        f = urllib2.urlopen(self.url)
-#        data = f.read()
-#        f.close()
-#        self.stream.write(data)
-#        self.stream.close()
-#
-#class ImageDownloader():
-#    def __init__(self):
-#        self.images = []
-#        self.downloading = False
-#        
-#    def queueImage(self, url, stream):
-#        self.images.append((url, stream))
-#        if not self.downloading:
-#            self.downloading = True
-#            gobject.timeout_add(50, self.checkQueue)
-#        
-#    def checkQueue(self):
-#        for i in range(4-threading.activeCount()):
-#            if len(self.images) > 0:
-#                (url, stream) = self.images.pop() 
-#                GetImage(url, stream).start()
-#        if len(self.images)>0:
-#            gobject.timeout_add(200, self.checkQueue)
-#        else:
-#            self.downloading=False
-#            
-#    def stopAll(self):
-#        self.images = []
         
-        
-class Download(threading.Thread):
+class Download(Thread):
     def __init__(self, listing, key, config):
-        threading.Thread.__init__(self)
+        Thread.__init__(self)
         self.listing = listing
         self.key = key
         self.config = config
         
     def run (self):
         (use_proxy, proxy) = self.config.getProxy()
-        if use_proxy:
-            self.listing.updateFeed(self.key, self.config.getExpiry(), proxy=proxy, imageCache=self.config.getImageCache() )
-        else:
-            self.listing.updateFeed(self.key, self.config.getExpiry(), imageCache=self.config.getImageCache() )
+        key_lock = get_lock(self.key)
+        if key_lock != None:
+            if use_proxy:
+                from urllib2 import install_opener, build_opener
+                install_opener(build_opener(proxy))
+                self.listing.updateFeed(self.key, self.config.getExpiry(), proxy=proxy, imageCache=self.config.getImageCache() )
+            else:
+                self.listing.updateFeed(self.key, self.config.getExpiry(), imageCache=self.config.getImageCache() )
+        del key_lock
 
         
 class DownloadBar(gtk.ProgressBar):
     def __init__(self, parent, listing, listOfKeys, config, single=False):
-        gtk.ProgressBar.__init__(self)
-        self.listOfKeys = listOfKeys[:]
-        self.listing = listing
-        self.total = len(self.listOfKeys)
-        self.config = config
-        self.current = 0
-        self.single = single
         
-        if self.total>0:
-            #self.progress = gtk.ProgressBar()
-            #self.waitingWindow = hildon.Note("cancel", parent, "Downloading",
-            #                     progressbar=self.progress)
-            self.set_text("Updating...")
-            self.fraction = 0
-            self.set_fraction(self.fraction)
-            self.show_all()
-            # Create a timeout
-            self.timeout_handler_id = gobject.timeout_add(50, self.update_progress_bar)
-            #self.waitingWindow.show_all()
-            #response = self.waitingWindow.run()
-            #self.listOfKeys = []
-            #while threading.activeCount() > 1:
-                # Wait for current downloads to finish
-            #    time.sleep(0.1)
-            #self.waitingWindow.destroy()
+        update_lock = get_lock("update_lock")
+        if update_lock != None:
+            gtk.ProgressBar.__init__(self)
+            self.listOfKeys = listOfKeys[:]
+            self.listing = listing
+            self.total = len(self.listOfKeys)
+            self.config = config
+            self.current = 0
+            self.single = single
+
+            if self.total>0:
+                self.set_text("Updating...")
+                self.fraction = 0
+                self.set_fraction(self.fraction)
+                self.show_all()
+                # Create a timeout
+                self.timeout_handler_id = gobject.timeout_add(50, self.update_progress_bar)
 
     def update_progress_bar(self):
         #self.progress_bar.pulse()
-        if threading.activeCount() < 4:
-            x = threading.activeCount() - 1
+        if activeCount() < 4:
+            x = activeCount() - 1
             k = len(self.listOfKeys)
             fin = self.total - k - x
             fraction = float(fin)/float(self.total) + float(x)/(self.total*2.)
@@ -216,16 +203,20 @@ class DownloadBar(gtk.ProgressBar):
             if len(self.listOfKeys)>0:
                 self.current = self.current+1
                 key = self.listOfKeys.pop()
-                if (not self.listing.getCurrentlyDisplayedFeed() == key) or (self.single == True):
+                #if self.single == True:
                     # Check if the feed is being displayed
-                    download = Download(self.listing, key, self.config)
-                    download.start()
+                download = Download(self.listing, key, self.config)
+                download.start()
                 return True
-            elif threading.activeCount() > 1:
+            elif activeCount() > 1:
                 return True
             else:
                 #self.waitingWindow.destroy()
                 #self.destroy()
+                try:
+                    del self.update_lock
+                except:
+                    pass
                 self.emit("download-done", "success")
                 return False 
         return True
@@ -385,7 +376,7 @@ class DisplayArticle(hildon.StackableWindow):
         
         # Init the article display
         #if self.config.getWebkitSupport():
-        self.view = webkit.WebView()
+        self.view = WebView()
             #self.view.set_editable(False)
         #else:
         #    import gtkhtml2
@@ -510,6 +501,7 @@ class DisplayArticle(hildon.StackableWindow):
     #    self.show_all()
 
     def _signal_link_clicked(self, object, link):
+        import dbus
         bus = dbus.SessionBus()
         proxy = bus.get_object("com.nokia.osso_browser", "/com/nokia/osso_browser/request")
         iface = dbus.Interface(proxy, 'com.nokia.osso_browser')
@@ -572,17 +564,18 @@ class DisplayFeed(hildon.StackableWindow):
         self.buttons = {}
         for id in self.feed.getIds():
             title = self.feed.getTitle(id)
-            esc_title = title.replace("<em>","").replace("</em>","").replace("&amp;","&").replace("&mdash;", "-").replace("&#8217;", "'")
+            esc_title = unescape(title)
+            #title.replace("<em>","").replace("</em>","").replace("&amp;","&").replace("&mdash;", "-").replace("&#8217;", "'")
             button = gtk.Button(esc_title)
             button.set_alignment(0,0)
             label = button.child
             if self.feed.isEntryRead(id):
-                #label.modify_font(pango.FontDescription("sans 16"))
-                label.modify_font(pango.FontDescription(self.config.getReadFont()))
+                #label.modify_font(FontDescription("sans 16"))
+                label.modify_font(FontDescription(self.config.getReadFont()))
                 label.modify_fg(gtk.STATE_NORMAL, read_color) # gtk.gdk.color_parse("white"))
             else:
                 #print self.listing.getFont() + " bold"
-                label.modify_font(pango.FontDescription(self.config.getUnreadFont()))
+                label.modify_font(FontDescription(self.config.getUnreadFont()))
                 label.modify_fg(gtk.STATE_NORMAL, unread_color)
             label.set_line_wrap(True)
             
@@ -629,21 +622,21 @@ class DisplayFeed(hildon.StackableWindow):
 
     def nextArticle(self, object, index):
         label = self.buttons[index].child
-        label.modify_font(pango.FontDescription(self.config.getReadFont()))
+        label.modify_font(FontDescription(self.config.getReadFont()))
         label.modify_fg(gtk.STATE_NORMAL, read_color) #  gtk.gdk.color_parse("white"))
         id = self.feed.getNextId(index)
         self.button_clicked(object, id, next=True)
 
     def previousArticle(self, object, index):
         label = self.buttons[index].child
-        label.modify_font(pango.FontDescription(self.config.getReadFont()))
+        label.modify_font(FontDescription(self.config.getReadFont()))
         label.modify_fg(gtk.STATE_NORMAL, read_color) # gtk.gdk.color_parse("white"))
         id = self.feed.getPreviousId(index)
         self.button_clicked(object, id, previous=True)
 
     def onArticleClosed(self, object, index):
         label = self.buttons[index].child
-        label.modify_font(pango.FontDescription(self.config.getReadFont()))
+        label.modify_font(FontDescription(self.config.getReadFont()))
         label.modify_fg(gtk.STATE_NORMAL, read_color) # gtk.gdk.color_parse("white"))
         self.buttons[index].show()
 
@@ -662,12 +655,13 @@ class DisplayFeed(hildon.StackableWindow):
         self.vbox.destroy()
         self.feed = self.listing.getFeed(self.key)
         self.displayFeed()
+        self.updateDbusHandler.ArticleCountUpdated()
         
     def buttonReadAllClicked(self, button):
         for index in self.feed.getIds():
             self.feed.setEntryRead(index)
             label = self.buttons[index].child
-            label.modify_font(pango.FontDescription(self.config.getReadFont()))
+            label.modify_font(FontDescription(self.config.getReadFont()))
             label.modify_fg(gtk.STATE_NORMAL, read_color) # gtk.gdk.color_parse("white"))
             self.buttons[index].show()
 
@@ -687,6 +681,11 @@ class FeedingIt:
         gobject.idle_add(self.createWindow)
         
     def createWindow(self):
+        self.app_lock = get_lock("app_lock")
+        if self.app_lock == None:
+            self.pannableListing.set_label("Update in progress, please wait.")
+            gobject.timeout_add_seconds(3, self.createWindow)
+            return False
         self.listing = Listing(CONFIGDIR)
         
         self.downloadDialog = False
@@ -739,6 +738,7 @@ class FeedingIt:
         
     def enableDbus(self):
         self.dbusHandler = ServerObject(self)
+        self.updateDbusHandler = UpdateServerObject(self)
 
     def button_markAll(self, button):
         for key in self.listing.getListOfFeeds():
@@ -778,6 +778,7 @@ class FeedingIt:
         
     def button_update_clicked(self, button, key):
         if not type(self.downloadDialog).__name__=="DownloadBar":
+            self.updateDbusHandler.UpdateStarted()
             self.downloadDialog = DownloadBar(self.window, self.listing, self.listing.getListOfFeeds(), self.config )
             self.downloadDialog.connect("download-done", self.onDownloadsDone)
             self.mainVbox.pack_end(self.downloadDialog, expand=False, fill=False)
@@ -789,7 +790,8 @@ class FeedingIt:
         self.downloadDialog = False
         #self.displayListing()
         self.refreshList()
-        self.dbusHandler.ArticleCountUpdated()
+        self.updateDbusHandler.UpdateFinished()
+        self.updateDbusHandler.ArticleCountUpdated()
 
     def button_preferences_clicked(self, button):
         dialog = self.config.createDialog()
@@ -851,18 +853,25 @@ class FeedingIt:
                 break
 
     def buttonFeedClicked(widget, button, self, window, key):
-        self.disp = DisplayFeed(self.listing, self.listing.getFeed(key), self.listing.getFeedTitle(key), key, self.config)
-        self.disp.connect("feed-closed", self.onFeedClosed)
+        try:
+            self.feed_lock
+        except:
+            # If feed_lock doesn't exist, we can open the feed, else we do nothing
+            self.feed_lock = get_lock(key)
+            self.disp = DisplayFeed(self.listing, self.listing.getFeed(key), self.listing.getFeedTitle(key), key, self.config)
+            self.disp.connect("feed-closed", self.onFeedClosed)
 
     def onFeedClosed(self, object, key):
         self.listing.saveConfig()
+        del self.feed_lock
         self.refreshList()
-        self.dbusHandler.ArticleCountUpdated()
+        self.updateDbusHandler.ArticleCountUpdated()
      
     def run(self):
         self.window.connect("destroy", gtk.main_quit)
         gtk.main()
         self.listing.saveConfig()
+        del self.app_lock
 
     def prefsClosed(self, *widget):
         self.orientation.set_mode(self.config.getOrientation())
@@ -891,6 +900,13 @@ class FeedingIt:
         self.button_update_clicked(None, None)
         return True
     
+    def stopUpdate(self):
+        # Not implemented in the app (see update_feeds.py)
+        try:
+            self.downloadDialog.listOfKeys = []
+        except:
+            pass
+    
     def getStatus(self):
         status = ""
         for key in self.listing.getListOfFeeds():
@@ -912,6 +928,7 @@ if __name__ == "__main__":
             mkdir(CONFIGDIR)
         except:
             print "Error: Can't create configuration directory"
-            sys.exit(1)
+            from sys import exit
+            exit(1)
     app = FeedingIt()
     app.run()

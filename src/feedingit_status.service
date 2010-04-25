@@ -1,0 +1,3 @@
+[D-BUS Service]
+Name=org.marcoz.feedingit
+Exec=/usr/bin/FeedingIt dbus

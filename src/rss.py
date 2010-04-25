@@ -23,8 +23,7 @@
 # Description : Simple RSS Reader
 # ============================================================================
 
-from os.path import isfile
-from os.path import isdir
+from os.path import isfile, isdir
 from shutil import rmtree
 from os import mkdir, remove
 import pickle
@@ -40,20 +39,20 @@ from urlparse import urlparse
 def getId(string):
     return md5.new(string).hexdigest()
 
-def getProxy():
-    import gconf
-    if gconf.client_get_default().get_bool('/system/http_proxy/use_http_proxy'):
-        port = gconf.client_get_default().get_int('/system/http_proxy/port')
-        http = gconf.client_get_default().get_string('/system/http_proxy/host')
-        proxy = proxy = urllib2.ProxyHandler( {"http":"http://%s:%s/"% (http,port)} )
-        return (True, proxy)
-    return (False, None)
+#def getProxy():
+#    import gconf
+#    if gconf.client_get_default().get_bool('/system/http_proxy/use_http_proxy'):
+#        port = gconf.client_get_default().get_int('/system/http_proxy/port')
+#        http = gconf.client_get_default().get_string('/system/http_proxy/host')
+#        proxy = proxy = urllib2.ProxyHandler( {"http":"http://%s:%s/"% (http,port)} )
+#        return (True, proxy)
+#    return (False, None)
 
 # Enable proxy support for images and ArchivedArticles
-(proxy_support, proxy) = getProxy()
-if proxy_support:
-    opener = urllib2.build_opener(proxy)
-    urllib2.install_opener(opener)
+#(proxy_support, proxy) = getProxy()
+#if proxy_support:
+#    opener = urllib2.build_opener(proxy)
+#    urllib2.install_opener(opener)
 
 # Entry = {"title":XXX, "content":XXX, "date":XXX, "link":XXX, images = [] }
 
@@ -157,6 +156,14 @@ class Feed:
            tmpIds = []
            for entry in tmp["entries"]:
                (dateTuple, date) = self.extractDate(entry)
+               try:
+                   entry["title"]
+               except:
+                   entry["title"] = "No Title"
+               try:
+                   entry["link"]
+               except:
+                   entry["link"] = ""
                tmpEntry = {"title":entry["title"], "content":self.extractContent(entry),
                             "date":date, "dateTuple":dateTuple, "link":entry["link"], "images":[] }
                id = self.generateUniqueId(tmpEntry)

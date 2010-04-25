@@ -19,18 +19,18 @@
 # ============================================================================
 # Name        : FeedingIt.py
 # Author      : Yves Marcoz
-# Version     : 0.5.4
+# Version     : 0.6.1
 # Description : Simple RSS Reader
 # ============================================================================
 
 import gtk
 import hildon
-import ConfigParser
-import gobject
-import gconf
-import urllib2
+from ConfigParser import RawConfigParser
+from gobject import idle_add
+from gconf import client_get_default
+from urllib2 import ProxyHandler
 
-VERSION = "0.5.4"
+VERSION = "0.6.1"
 
 section = "FeedingIt"
 ranges = { "updateInterval":[0.5, 1, 2, 4, 12, 24], "expiry":[24, 48, 72], "fontSize":range(12,24), "orientation":["Automatic", "Landscape", "Portrait"], "artFontSize":[10, 12, 14, 16, 18, 20]}
@@ -65,7 +65,7 @@ class Config():
             vbox.pack_start(picker, expand=False)
         
         button = hildon.CheckButton(gtk.HILDON_SIZE_FINGER_HEIGHT)
-        button.set_label("Auto-update Enabled")
+        button.set_label("Auto-update Enabled.")
         button.set_active(self.config["autoupdate"])
         button.connect("toggled", self.button_toggled, "autoupdate")
         vbox.pack_start(button, expand=False)
@@ -74,6 +74,12 @@ class Config():
         button.set_label("Image Caching Enabled")
         button.set_active(self.config["imageCache"])
         button.connect("toggled", self.button_toggled, "imageCache")
+        vbox.pack_start(button, expand=False)
+        
+        button = hildon.CheckButton(gtk.HILDON_SIZE_FINGER_HEIGHT)
+        button.set_label("Proxy Support Enabled")
+        button.set_active(self.config["proxy"])
+        button.connect("toggled", self.button_toggled, "proxy")
         vbox.pack_start(button, expand=False)
         
         button = hildon.Button(gtk.HILDON_SIZE_FINGER_HEIGHT, hildon.BUTTON_ARRANGEMENT_VERTICAL)
@@ -124,7 +130,7 @@ class Config():
     def loadConfig(self):
         self.config = {}
         try:
-            configParser = ConfigParser.RawConfigParser()
+            configParser = RawConfigParser()
             configParser.read(self.configFilename)
             self.config["fontSize"] = configParser.getint(section, "fontSize")
             self.config["artFontSize"] = configParser.getint(section, "artFontSize")
@@ -141,9 +147,13 @@ class Config():
             self.config["updateInterval"] = 4
             self.config["orientation"] = "Automatic"
             self.config["imageCache"] = False
+        try:
+            self.config["proxy"] = configParser.getboolean(section, "proxy")
+        except:
+            self.config["proxy"] = True
         
     def saveConfig(self):
-        configParser = ConfigParser.RawConfigParser()
+        configParser = RawConfigParser()
         configParser.add_section(section)
         configParser.set(section, 'fontSize', str(self.config["fontSize"]))
         configParser.set(section, 'artFontSize', str(self.config["artFontSize"]))
@@ -152,6 +162,7 @@ class Config():
         configParser.set(section, 'updateInterval', str(self.config["updateInterval"]))
         configParser.set(section, 'orientation', str(self.config["orientation"]))
         configParser.set(section, 'imageCache', str(self.config["imageCache"]))
+        configParser.set(section, 'proxy', str(self.config["proxy"]))
 
         # Writing our configuration file
         file = open(self.configFilename, 'wb')
@@ -191,9 +202,11 @@ class Config():
     def getImageCache(self):
         return self.config["imageCache"]
     def getProxy(self):
-        if gconf.client_get_default().get_bool('/system/http_proxy/use_http_proxy'):
-            port = gconf.client_get_default().get_int('/system/http_proxy/port')
-            http = gconf.client_get_default().get_string('/system/http_proxy/host')
-            proxy = proxy = urllib2.ProxyHandler( {"http":"http://%s:%s/"% (http,port)} )
+        if self.config["proxy"] == False:
+            return (False, None)
+        if client_get_default().get_bool('/system/http_proxy/use_http_proxy'):
+            port = client_get_default().get_int('/system/http_proxy/port')
+            http = client_get_default().get_string('/system/http_proxy/host')
+            proxy = ProxyHandler( {"http":"http://%s:%s/"% (http,port)} )
             return (True, proxy)
         return (False, None)
