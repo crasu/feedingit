@@ -46,6 +46,8 @@ from cgi import escape
 from rss import Listing
 from opml import GetOpmlData, ExportOpmlData
 
+from urllib2 import install_opener, build_opener
+
 from socket import setdefaulttimeout
 timeout = 5
 setdefaulttimeout(timeout)
@@ -161,8 +163,6 @@ class Download(Thread):
         key_lock = get_lock(self.key)
         if key_lock != None:
             if use_proxy:
-                from urllib2 import install_opener, build_opener
-                install_opener(build_opener(proxy))
                 self.listing.updateFeed(self.key, self.config.getExpiry(), proxy=proxy, imageCache=self.config.getImageCache() )
             else:
                 self.listing.updateFeed(self.key, self.config.getExpiry(), imageCache=self.config.getImageCache() )
@@ -181,6 +181,15 @@ class DownloadBar(gtk.ProgressBar):
             self.config = config
             self.current = 0
             self.single = single
+            (use_proxy, proxy) = self.config.getProxy()
+            if use_proxy:
+                opener = build_opener(proxy)
+                opener.addheaders = [('User-agent', 'Mozilla/5.0 (compatible; Maemo 5;) FeedingIt 0.6.1')]
+                install_opener(opener)
+            else:
+                opener = build_opener()
+                opener.addheaders = [('User-agent', 'Mozilla/5.0 (compatible; Maemo 5;) FeedingIt 0.6.1')]
+                install_opener(opener)
 
             if self.total>0:
                 self.set_text("Updating...")
@@ -373,6 +382,7 @@ class DisplayArticle(hildon.StackableWindow):
         #self.set_title(feed.getTitle(id))
         self.set_title(self.listing.getFeedTitle(key))
         self.config = config
+        self.set_for_removal = False
         
         # Init the article display
         #if self.config.getWebkitSupport():
@@ -423,9 +433,14 @@ class DisplayArticle(hildon.StackableWindow):
         button.connect("clicked", self._signal_link_clicked, self.feed.getExternalLink(self.id))
         menu.append(button)
         
-        button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
-        button.set_label("Add to Archived Articles")
-        button.connect("clicked", self.archive_button)
+        if key == "ArchivedArticles":
+            button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
+            button.set_label("Remove from Archived Articles")
+            button.connect("clicked", self.remove_archive_button)
+        else:
+            button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
+            button.set_label("Add to Archived Articles")
+            button.connect("clicked", self.archive_button)
         menu.append(button)
         
         self.set_app_menu(menu)
@@ -476,7 +491,10 @@ class DisplayArticle(hildon.StackableWindow):
 
     def destroyWindow(self, *args):
         self.disconnect(self.destroyId)
-        self.emit("article-closed", self.id)
+        if self.set_for_removal:
+            self.emit("article-deleted", self.id)
+        else:
+            self.emit("article-closed", self.id)
         #self.imageDownloader.stopAll()
         self.destroy()
         
@@ -487,6 +505,9 @@ class DisplayArticle(hildon.StackableWindow):
     def archive_button(self, *widget):
         # Call the listing.addArchivedArticle
         self.listing.addArchivedArticle(self.key, self.id)
+        
+    def remove_archive_button(self, *widget):
+        self.set_for_removal = True
         
     #def reloadArticle(self, *widget):
     #    if threading.activeCount() > 1:
@@ -516,7 +537,7 @@ class DisplayArticle(hildon.StackableWindow):
 
 
 class DisplayFeed(hildon.StackableWindow):
-    def __init__(self, listing, feed, title, key, config):
+    def __init__(self, listing, feed, title, key, config, updateDbusHandler):
         hildon.StackableWindow.__init__(self)
         self.listing = listing
         self.feed = feed
@@ -524,10 +545,11 @@ class DisplayFeed(hildon.StackableWindow):
         self.set_title(title)
         self.key=key
         self.config = config
+        self.updateDbusHandler = updateDbusHandler
         
         self.downloadDialog = False
         
-        self.listing.setCurrentlyDisplayedFeed(self.key)
+        #self.listing.setCurrentlyDisplayedFeed(self.key)
         
         self.disp = False
         
@@ -541,6 +563,13 @@ class DisplayFeed(hildon.StackableWindow):
         button.set_label("Mark All As Read")
         button.connect("clicked", self.buttonReadAllClicked)
         menu.append(button)
+        
+        if key=="ArchivedArticles":
+            button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
+            button.set_label("Purge Read Articles")
+            button.connect("clicked", self.buttonPurgeArticles)
+            menu.append(button)
+        
         self.set_app_menu(menu)
         menu.show_all()
         
@@ -549,12 +578,13 @@ class DisplayFeed(hildon.StackableWindow):
         self.connect("destroy", self.destroyWindow)
         
     def destroyWindow(self, *args):
-        self.feed.saveUnread(CONFIGDIR)
+        #self.feed.saveUnread(CONFIGDIR)
+        gobject.idle_add(self.feed.saveUnread, CONFIGDIR)
         self.listing.updateUnread(self.key, self.feed.getNumberOfUnreadItems())
         self.emit("feed-closed", self.key)
         self.destroy()
         #gobject.idle_add(self.feed.saveFeed, CONFIGDIR)
-        self.listing.closeCurrentlyDisplayedFeed()
+        #self.listing.closeCurrentlyDisplayedFeed()
 
     def displayFeed(self):
         self.vboxFeed = gtk.VBox(False, 10)
@@ -613,9 +643,18 @@ class DisplayFeed(hildon.StackableWindow):
             self.disp.show_all()
         
         self.ids = []
+        if self.key == "ArchivedArticles":
+            self.ids.append(self.disp.connect("article-deleted", self.onArticleDeleted))
         self.ids.append(self.disp.connect("article-closed", self.onArticleClosed))
         self.ids.append(self.disp.connect("article-next", self.nextArticle))
         self.ids.append(self.disp.connect("article-previous", self.previousArticle))
+
+    def buttonPurgeArticles(self, *widget):
+        self.clear()
+        self.feed.purgeReadArticles()
+        self.feed.saveUnread(CONFIGDIR)
+        self.feed.saveFeed(CONFIGDIR)
+        self.displayFeed()
 
     def destroyArticle(self, handle):
         handle.destroyWindow()
@@ -639,6 +678,13 @@ class DisplayFeed(hildon.StackableWindow):
         label.modify_font(FontDescription(self.config.getReadFont()))
         label.modify_fg(gtk.STATE_NORMAL, read_color) # gtk.gdk.color_parse("white"))
         self.buttons[index].show()
+        
+    def onArticleDeleted(self, object, index):
+        self.clear()
+        self.feed.removeArticle(index)
+        self.feed.saveUnread(CONFIGDIR)
+        self.feed.saveFeed(CONFIGDIR)
+        self.displayFeed()
 
     def button_update_clicked(self, button):
         #bar = DownloadBar(self, self.listing, [self.key,], self.config ) 
@@ -858,13 +904,19 @@ class FeedingIt:
         except:
             # If feed_lock doesn't exist, we can open the feed, else we do nothing
             self.feed_lock = get_lock(key)
-            self.disp = DisplayFeed(self.listing, self.listing.getFeed(key), self.listing.getFeedTitle(key), key, self.config)
+            self.disp = DisplayFeed(self.listing, self.listing.getFeed(key), self.listing.getFeedTitle(key), key, self.config, self.updateDbusHandler)
             self.disp.connect("feed-closed", self.onFeedClosed)
 
     def onFeedClosed(self, object, key):
+        #self.listing.saveConfig()
+        #del self.feed_lock
+        gobject.idle_add(self.onFeedClosedTimeout)
+        self.refreshList()
+        #self.updateDbusHandler.ArticleCountUpdated()
+        
+    def onFeedClosedTimeout(self):
         self.listing.saveConfig()
         del self.feed_lock
-        self.refreshList()
         self.updateDbusHandler.ArticleCountUpdated()
      
     def run(self):
@@ -897,6 +949,10 @@ class FeedingIt:
         # Need to check for internet connection
         # If no internet connection, try again in 10 minutes:
         # gobject.timeout_add(int(5*3600000), self.automaticUpdate)
+        file = open("/home/user/.feedingit/feedingit_widget.log", "a")
+        from time import localtime, strftime
+        file.write("App: %s\n" % strftime("%a, %d %b %Y %H:%M:%S +0000", localtime()))
+        file.close()
         self.button_update_clicked(None, None)
         return True
     
@@ -919,6 +975,7 @@ class FeedingIt:
 if __name__ == "__main__":
     gobject.signal_new("feed-closed", DisplayFeed, gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,))
     gobject.signal_new("article-closed", DisplayArticle, gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,))
+    gobject.signal_new("article-deleted", DisplayArticle, gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,))
     gobject.signal_new("article-next", DisplayArticle, gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,))
     gobject.signal_new("article-previous", DisplayArticle, gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,))
     gobject.signal_new("download-done", DownloadBar, gobject.SIGNAL_RUN_LAST, gobject.TYPE_NONE, (gobject.TYPE_PYOBJECT,))

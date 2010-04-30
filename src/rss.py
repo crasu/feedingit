@@ -32,7 +32,7 @@ import feedparser
 import time
 import urllib2
 from BeautifulSoup import BeautifulSoup
-from urlparse import urlparse
+from urlparse import urljoin
 
 #CONFIGDIR="/home/user/.feedingit/"
 
@@ -65,16 +65,18 @@ class ImageHandler:
         filename = self.configdir+key+".d/"+getId(url)
         if not isfile(filename):
             try:
-                if url.startswith("http"):
-                    f = urllib2.urlopen(url)
-                else:
-                    f = urllib2.urlopen(baseurl+"/"+url)
+                #if url.startswith("http"):
+                #    f = urllib2.urlopen(url)
+                #else:
+                f = urllib2.urlopen(urljoin(baseurl,url))
                 outf = open(filename, "w")
                 outf.write(f.read())
                 f.close()
                 outf.close()
             except:
-                print "Could not download" + url
+                print "Could not download " + url
+        else:
+            open(filename,"a").close()  # "Touch" the file
         if filename in self.images:
             self.images[filename] += 1
         else:
@@ -172,7 +174,7 @@ class Feed:
                if not id in self.ids:
                    soup = BeautifulSoup(self.getArticle(tmpEntry)) #tmpEntry["content"])
                    images = soup('img')
-                   baseurl = ''.join(urlparse(tmpEntry["link"])[:-1])
+                   baseurl = tmpEntry["link"]
                    if imageCache:
                       for img in images:
                           try:
@@ -180,7 +182,7 @@ class Feed:
                             img['src']=filename
                             tmpEntry["images"].append(filename)
                           except:
-                              print "Error downloading image %s" %img
+                              print "Error downloading image %s" % img
                    tmpEntry["contentLink"] = configdir+self.uniqueId+".d/"+id+".html"
                    file = open(tmpEntry["contentLink"], "w")
                    file.write(soup.prettify())
@@ -222,6 +224,10 @@ class Feed:
                    self.readItems[id] = False
                if self.readItems[id]==False:
                   tmpUnread = tmpUnread + 1
+           keys = self.readItems.keys()
+           for id in keys:
+               if not id in self.ids:
+                   del self.readItems[id]
            del tmp
            self.countUnread = tmpUnread
            self.updateTime = time.asctime()
@@ -404,24 +410,9 @@ class ArchivedArticles(Feed):
                     f.close()
                     soup = BeautifulSoup(html)
                     images = soup('img')
-                    baseurl = ''.join(urlparse(entry["link"])[:-1])
+                    baseurl = entry["link"]
                     for img in images:
                         filename = self.imageHandler.addImage(self.uniqueId, baseurl, img['src'])
-                        #filename = configdir+self.uniqueId+".d/"+getId(img['src'])
-                        #if not isfile(filename):
-                        #    try:
-                        #        if img['src'].startswith("http"):
-                        #            f = urllib2.urlopen(img['src'])
-                        #        else:
-                        #            f = urllib2.urlopen(baseurl+"/"+img['src'])
-                        #            #print baseurl+"/"+img['src']
-                        #        print filename
-                        #        outf = open(filename, "w")
-                        #        outf.write(f.read())
-                        #        f.close()
-                        #        outf.close()
-                        #    except:
-                        #        print "Could not download" + img['src']
                         img['src']=filename
                         entry["images"].append(filename)
                     entry["contentLink"] = configdir+self.uniqueId+".d/"+id+".html"
@@ -434,16 +425,26 @@ class ArchivedArticles(Feed):
                         self.setEntryUnread(id)
                 #except:
                 #    pass
-            currentTime = time.time()
-            expiry = float(expiryTime) * 3600
-            if currentTime - entry["time"] > expiry:
-                if self.isEntryRead(id):
-                    self.removeEntry(id)
-                else:
-                    if currentTime - entry["time"] > 2*expiry:
-                        self.removeEntry(id)
+            #currentTime = time.time()
+            #expiry = float(expiryTime) * 3600
+            #if currentTime - entry["time"] > expiry:
+            #    if self.isEntryRead(id):
+            #        self.removeEntry(id)
+            #    else:
+            #        if currentTime - entry["time"] > 2*expiry:
+            #            self.removeEntry(id)
         self.updateTime = time.asctime()
         self.saveFeed(configdir)
+        
+    def purgeReadArticles(self):
+        ids = self.getIds()
+        for id in ids:
+            entry = self.entries[id]
+            if self.isEntryRead(id):
+                self.removeEntry(id)
+                
+    def removeArticle(self, id):
+        self.removeEntry(id)
 
     def getArticle(self, index):
         self.setEntryRead(index)
@@ -478,7 +479,7 @@ class Listing:
                 self.sortedKeys.remove("font")
             self.sortedKeys.sort(key=lambda obj: self.getFeedTitle(obj))
         list = self.sortedKeys[:]
-        self.closeCurrentlyDisplayedFeed()
+        #self.closeCurrentlyDisplayedFeed()
 
     def addArchivedArticle(self, key, index):
         feed = self.getFeed(key)
@@ -600,13 +601,6 @@ class Listing:
         index2 = (index+1)%len(self.sortedKeys)
         self.sortedKeys[index] = self.sortedKeys[index2]
         self.sortedKeys[index2] = key
-        
-    def setCurrentlyDisplayedFeed(self, key):
-        self.currentlyDisplayedFeed = key
-    def closeCurrentlyDisplayedFeed(self):
-        self.currentlyDisplayedFeed = False
-    def getCurrentlyDisplayedFeed(self):
-        return self.currentlyDisplayedFeed
     
 if __name__ == "__main__":
     listing = Listing('/home/user/.feedingit/')

@@ -271,10 +271,9 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
     def start_update(self):
         try:
             if self.autoupdate >0:
-                import traceback
                 file = open("/home/user/.feedingit/feedingit_widget.log", "a")
-                from time import gmtime, strftime
-                file.write(strftime("%a, %d %b %Y %H:%M:%S +0000", gmtime()))
+                from time import localtime, strftime
+                file.write("Widget: %s\n" % strftime("%a, %d %b %Y %H:%M:%S +0000", localtime()))
                 file.close()
                 remote_object = bus.get_object("org.marcoz.feedingit", # Connection name
                               "/org/marcoz/feedingit/update" # Object's path
