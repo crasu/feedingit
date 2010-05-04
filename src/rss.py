@@ -537,8 +537,21 @@ class Listing:
         feed.editFeed(url)
 
     def getFeed(self, key):
-        feed = self.loadFeed(key)
-        feed.reloadUnread(self.configdir)
+        try:
+            feed = self.loadFeed(key)
+            feed.reloadUnread(self.configdir)
+        except:
+            # If the feed file gets corrupted, we need to reset the feed.
+            import dbus
+            bus = dbus.SessionBus()
+            remote_object = bus.get_object("org.freedesktop.Notifications", # Connection name
+                               "/org/freedesktop/Notifications" # Object's path
+                              )
+            iface = dbus.Interface(remote_object, 'org.freedesktop.Notifications')
+            iface.SystemNoteInfoprint("Error opening feed %s, it has been reset." % self.getFeedTitle(key))
+            if isdir(self.configdir+key+".d/"):
+                rmtree(self.configdir+key+".d/")
+            feed = self.loadFeed(key)
         return feed
     
     def getFeedUpdateTime(self, key):

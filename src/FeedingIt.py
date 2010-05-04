@@ -594,11 +594,13 @@ class DisplayFeed(hildon.StackableWindow):
         self.buttons = {}
         for id in self.feed.getIds():
             title = self.feed.getTitle(id)
-            esc_title = unescape(title)
+            
+            esc_title = unescape(title).replace("<em>","").replace("</em>","")
             #title.replace("<em>","").replace("</em>","").replace("&amp;","&").replace("&mdash;", "-").replace("&#8217;", "'")
             button = gtk.Button(esc_title)
             button.set_alignment(0,0)
             label = button.child
+
             if self.feed.isEntryRead(id):
                 #label.modify_font(FontDescription("sans 16"))
                 label.modify_font(FontDescription(self.config.getReadFont()))

@@ -1,3 +1,15 @@
+feedingit (0.6.1-7) unstable; urgency=low
+
+  * Added check for broken feeds
+
+ -- Yves <yves@marcoz.org>  Mon, 03 May 2010 21:44:19 -0800
+
+feedingit (0.6.1-6) unstable; urgency=low
+
+  * Fix for <em> tags
+
+ -- Yves <yves@marcoz.org>  Fri, 30 Apr 2010 20:54:19 -0800
+
 feedingit (0.6.1-5) unstable; urgency=low
 
   * Small performance fixes
