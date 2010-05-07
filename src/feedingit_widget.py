@@ -193,7 +193,7 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
         
     def create_autoupdate_picker(self):
             picker = hildon.PickerButton(gtk.HILDON_SIZE_FINGER_HEIGHT, hildon.BUTTON_ARRANGEMENT_VERTICAL)
-            selector = self.create_selector(["Disabled", 0.02, 0.5, 1, 2, 4, 12, 24], "autoupdate")
+            selector = self.create_selector(["Disabled", 0.5, 1, 2, 4, 12, 24], "autoupdate")
             picker.set_selector(selector)
             picker.set_title("Frequency of updates from the widget")
             picker.set_text("Setup Feed Auto-updates","Update every %s hours" %str(self.autoupdate) )
@@ -302,7 +302,7 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
     def setup_autoupdate(self):
         if (float(self.autoupdate) > 0):
             if (not self.autoupdateID==False):
-                gobject.disconnect(self.autoupdateId)
+                gobject.source_remove(self.autoupdateId)
             self.autoupdateId = gobject.timeout_add_seconds(int(float(self.autoupdate)*3600), self.start_update)
         else:
             if (not self.autoupdateID==False):
