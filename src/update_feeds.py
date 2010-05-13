@@ -31,30 +31,37 @@ import os
 import gobject
 
 CONFIGDIR="/home/user/.feedingit/"
-LOCK = CONFIGDIR + "update.lock"
 #DESKTOP_FILE = "/usr/share/applications/hildon-status-menu/feedingit_status.desktop"
+dbug = True
+
+from socket import setdefaulttimeout
+timeout = 5
+setdefaulttimeout(timeout)
+del timeout
 
 from updatedbus import UpdateServerObject, get_lock
 
 class Download(threading.Thread):
     def __init__(self, listing, config, dbusHandler):
+        global dbug
         threading.Thread.__init__(self)
         self.running = True
         self.listing = listing
         self.config = config
         self.dbusHandler = dbusHandler
-        self.dbug = open(CONFIGDIR+"dbug.log", "w")
-        self.dbug.flush()
+        if dbug:
+            self.dbug = open(CONFIGDIR+"dbug.log", "w")
         
     def run(self):
-        self.dbug.write("Starting updates")
-        self.dbug.flush()
+        global dbug
+        if dbug:
+            self.dbug.write("Starting updates\n")
         try:
             self.dbusHandler.UpdateStarted()
             (use_proxy, proxy) = self.config.getProxy()
             for key in self.listing.getListOfFeeds():
-                self.dbug.write("updating %s\n" %key)
-                self.dbug.flush()
+                if dbug:
+                    self.dbug.write("updating %s\n" %key)
                 try:
                     if use_proxy:
                         from urllib2 import install_opener, build_opener
@@ -73,22 +80,17 @@ class Download(threading.Thread):
                     break
             self.dbusHandler.UpdateFinished()
             self.dbusHandler.ArticleCountUpdated()
-            self.dbug.write("Dbus ArticleCountUpdated signal sent\n")
-            self.dbug.flush()
-            try:
-                os.remove(LOCK)
-                #os.remove(DESKTOP_FILE)
-            except:
-                pass
+            if dbug:
+                self.dbug.write("Dbus ArticleCountUpdated signal sent\n")
         except:
             pass
         self.listing.saveConfig()
-        self.dbug.write("About to main_quit\n")
-        self.dbug.flush()
+        if dbug:
+            self.dbug.write("About to main_quit\n")
         mainloop.quit()
-        file.write("After main_quit\n")
-        self.dbug.flush()
-        self.dbug.close()
+        if dbug:
+            self.dbug.write("After main_quit\n")
+            self.dbug.close()
 
 class FeedUpdate():
     def __init__(self):

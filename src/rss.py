@@ -149,6 +149,19 @@ class Feed:
         expiry = float(expiryTime) * 3600.
         # Check if the parse was succesful (number of entries > 0, else do nothing)
         if len(tmp["entries"])>0:
+           try:
+               f = urllib2.urlopen(urljoin(tmp["feed"]["link"],"/favicon.ico"))
+               data = f.read()
+               f.close()
+               outf = open(configdir+self.uniqueId+".d/favicon.ico", "w")
+               outf.write(data)
+               outf.close()
+               del data
+           except:
+                import traceback
+                traceback.print_exc()
+
+
            #reversedEntries = self.getEntries()
            #reversedEntries.reverse()
            if not isdir(configdir+self.uniqueId+".d"):
@@ -576,6 +589,13 @@ class Listing:
     
     def getListOfFeeds(self):
         return self.sortedKeys
+    
+    def getFavicon(self, key):
+        filename = self.configdir+key+".d/favicon.ico"
+        if isfile(filename):
+            return filename
+        else:
+            return False
     
     def addFeed(self, title, url):
         if not self.listOfFeeds.has_key(getId(title)):

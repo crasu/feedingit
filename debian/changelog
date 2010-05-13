@@ -1,8 +1,15 @@
-feedingit (0.6.1-8) unstable; urgency=low
+feedingit (0.6.2-0) unstable; urgency=low
+
+  * Added icons to feeds
+  * Added timeout to widget updates to prevent hanging
+
+ -- Yves <yves@marcoz.org>  Tue, 12 May 2010 07:21:19 -0800
+
+feedingit (0.6.1-9) unstable; urgency=low
 
   * Fixed bug triggering updates from widgets too often
 
- -- Yves <yves@marcoz.org>  Mon, 03 May 2010 21:44:19 -0800
+ -- Yves <yves@marcoz.org>  Mon, 10 May 2010 21:55:19 -0800
 
 feedingit (0.6.1-7) unstable; urgency=low
 

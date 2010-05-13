@@ -868,6 +868,7 @@ class FeedingIt:
         self.buttons = {}
         list = self.listing.getListOfFeeds()[:]
         #list.reverse()
+        icon_theme = gtk.icon_theme_get_default()
         for key in list:
             #button = gtk.Button(item)
             unreadItems = self.listing.getFeedNumberOfUnreadItems(key)
@@ -875,6 +876,16 @@ class FeedingIt:
                               hildon.BUTTON_ARRANGEMENT_VERTICAL)
             button.set_text(self.listing.getFeedTitle(key), self.listing.getFeedUpdateTime(key) + " / " 
                             + str(unreadItems) + " Unread Items")
+            icon = self.listing.getFavicon(key)
+            image = gtk.Image()
+            try:
+                pixbuf = gtk.gdk.pixbuf_new_from_file_at_size(icon, 32, 32)
+            except:
+                pixbuf = icon_theme.load_icon("feedingit", 32, gtk.ICON_LOOKUP_USE_BUILTIN )
+
+            image.set_from_pixbuf(pixbuf)
+            button.set_image(image)
+            button.set_image_position(gtk.POS_LEFT)
             button.set_alignment(0,0,1,1)
             button.connect("clicked", self.buttonFeedClicked, self, self.window, key)
             self.vboxListing.pack_start(button, expand=False)
@@ -891,7 +902,7 @@ class FeedingIt:
                 unreadItems = self.listing.getFeedNumberOfUnreadItems(key)
                 button.set_text(self.listing.getFeedTitle(key), self.listing.getFeedUpdateTime(key) + " / " 
                             + str(unreadItems) + " Unread Items")
-                label = button.child.child.get_children()[0].get_children()[1]
+                label = button.child.child.get_children()[1].get_children()[1]
                 if unreadItems == 0:
                     label.modify_fg(gtk.STATE_NORMAL, read_color)
                 else:

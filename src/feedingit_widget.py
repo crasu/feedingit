@@ -34,8 +34,9 @@ from dbus.mainloop.glib import DBusGMainLoop
 dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 #bus = dbus.SessionBus()
 
-from os import environ
+from os import environ, remove
 bus = dbus.bus.BusConnection(environ["DBUS_SESSION_BUS_ADDRESS"])
+from os.path import isfile
 
 color_style = gtk.rc_get_style_by_paths(gtk.settings_get_default() , 'GtkButton', 'osso-logical-colors', gtk.Button)
 active_color = color_style.lookup_color('ActiveTextColor')
@@ -43,6 +44,7 @@ default_color = color_style.lookup_color('DefaultTextColor')
 del color_style
 
 CONFIGDIR="/home/user/.feedingit/"
+SOURCE=CONFIGDIR + "source"
 
 #DBusConnection *hd_home_plugin_item_get_dbus_connection ( HDHomePluginItem *item, DBusBusType type, DBusError *error);
 #import ctypes
@@ -51,13 +53,22 @@ CONFIGDIR="/home/user/.feedingit/"
 
 class FeedingItHomePlugin(hildondesktop.HomePluginItem):
     def __init__(self):
+      __gsignals__ = {
+      'destroy' : 'override'
+      }
+
       try:
         hildondesktop.HomePluginItem.__init__(self)
         self.set_settings(True)
         self.connect("show-settings", self.show_settings)
         self.feed_list = {}
         self.total = 0
-        self.autoupdateID=False
+        if isfile(SOURCE):
+            file = open(SOURCE)
+            self.autoupdateId = int(file.read())
+            file.close() 
+        else:
+            self.autoupdateId=False
         
         vbox = gtk.VBox(False, 0)
         
@@ -102,6 +113,18 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
           file = open("/home/user/.feedingit/feedingit_widget.log", "a")
           traceback.print_exc(file=file)
           file.close()
+          
+    def do_destroy(self):
+        file = open("/home/user/.feedingit/feedingit_widget.log", "a")
+        file.write("Do_destroy: ")
+        if (not self.autoupdateId==False):
+            gobject.source_remove(self.autoupdateId)
+            self.autoupdateId=False
+            file.write("Destroyed %s\n" %self.autoupdateId)
+            remove(SOURCE)
+        hildondesktop.HomePluginItem.do_destroy(self)
+        file.write("End destroy\n")
+        file.close()
 
     def button_clicked(self, *widget):
         self.button.set_sensitive(False)
@@ -301,13 +324,24 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
 
     def setup_autoupdate(self):
         if (float(self.autoupdate) > 0):
-            if (not self.autoupdateID==False):
+            if (not self.autoupdateId==False):
+                file = open("/home/user/.feedingit/feedingit_widget.log", "a")
+                file.write("Disabling %s\n" % self.autoupdateId)
+                file.close()
                 gobject.source_remove(self.autoupdateId)
+                remove(SOURCE)
             self.autoupdateId = gobject.timeout_add_seconds(int(float(self.autoupdate)*3600), self.start_update)
+            file = open(SOURCE, "w")
+            file.write(str(self.autoupdateId))
+            file.close()
+            file = open("/home/user/.feedingit/feedingit_widget.log", "a")
+            file.write("Started %s\n" % self.autoupdateId)
+            file.close()
         else:
-            if (not self.autoupdateID==False):
-                gobject.disconnect(self.autoupdateId)
-                self.autoupdateID=False
+            if (not self.autoupdateId==False):
+                gobject.source_remove(self.autoupdateId)
+                self.autoupdateId=False
+                remove(SOURCE)
 
     def load_config(self):
             try:
