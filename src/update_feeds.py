@@ -32,7 +32,7 @@ import gobject
 
 CONFIGDIR="/home/user/.feedingit/"
 #DESKTOP_FILE = "/usr/share/applications/hildon-status-menu/feedingit_status.desktop"
-dbug = True
+dbug = False
 
 from socket import setdefaulttimeout
 timeout = 5
@@ -75,8 +75,8 @@ class Download(threading.Thread):
                     traceback.print_exc(file=file)
                     file.close()
                 if not self.running:
-                    self.dbug.write("received stopUpdate after %s\n" %key)
-                    self.dbug.flush()
+                    if dbug:
+                        self.dbug.write("received stopUpdate after %s\n" %key)
                     break
             self.dbusHandler.UpdateFinished()
             self.dbusHandler.ArticleCountUpdated()
@@ -126,7 +126,7 @@ if app_lock != None:
         del app_lock
     except:
         import traceback
-        file = open("/home/user/.feedingit/feedingit_update.log", "a")
+        file = open("/home/user/.feedingit/feedingit_update.log", "w")
         traceback.print_exc(file=file)
         file.close()
 else:

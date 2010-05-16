@@ -115,16 +115,16 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
           file.close()
           
     def do_destroy(self):
-        file = open("/home/user/.feedingit/feedingit_widget.log", "a")
-        file.write("Do_destroy: ")
+        #file = open("/home/user/.feedingit/feedingit_widget.log", "a")
+        #file.write("Do_destroy: ")
         if (not self.autoupdateId==False):
             gobject.source_remove(self.autoupdateId)
             self.autoupdateId=False
-            file.write("Destroyed %s\n" %self.autoupdateId)
+            #file.write("Destroyed %s\n" %self.autoupdateId)
             remove(SOURCE)
         hildondesktop.HomePluginItem.do_destroy(self)
-        file.write("End destroy\n")
-        file.close()
+        #file.write("End destroy\n")
+        #file.close()
 
     def button_clicked(self, *widget):
         self.button.set_sensitive(False)
@@ -294,11 +294,11 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
     def start_update(self):
         try:
             if self.autoupdate >0:
-                file = open("/home/user/.feedingit/feedingit_widget.log", "a")
-                from time import localtime, strftime
-                import os
-                file.write("Widget: pid:%s ppid:%s time:%s\n" % (os.getpid(), os.getppid(), strftime("%a, %d %b %Y %H:%M:%S +0000", localtime())))
-                file.close()
+                #file = open("/home/user/.feedingit/feedingit_widget.log", "a")
+                #from time import localtime, strftime
+                #import os
+                #file.write("Widget: pid:%s ppid:%s time:%s\n" % (os.getpid(), os.getppid(), strftime("%a, %d %b %Y %H:%M:%S +0000", localtime())))
+                #file.close()
                 remote_object = bus.get_object("org.marcoz.feedingit", # Connection name
                               "/org/marcoz/feedingit/update" # Object's path
                               )
@@ -325,18 +325,18 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
     def setup_autoupdate(self):
         if (float(self.autoupdate) > 0):
             if (not self.autoupdateId==False):
-                file = open("/home/user/.feedingit/feedingit_widget.log", "a")
-                file.write("Disabling %s\n" % self.autoupdateId)
-                file.close()
+                #file = open("/home/user/.feedingit/feedingit_widget.log", "a")
+                #file.write("Disabling %s\n" % self.autoupdateId)
+                #file.close()
                 gobject.source_remove(self.autoupdateId)
                 remove(SOURCE)
             self.autoupdateId = gobject.timeout_add_seconds(int(float(self.autoupdate)*3600), self.start_update)
             file = open(SOURCE, "w")
             file.write(str(self.autoupdateId))
             file.close()
-            file = open("/home/user/.feedingit/feedingit_widget.log", "a")
-            file.write("Started %s\n" % self.autoupdateId)
-            file.close()
+            #file = open("/home/user/.feedingit/feedingit_widget.log", "a")
+            #file.write("Started %s\n" % self.autoupdateId)
+            #file.close()
         else:
             if (not self.autoupdateId==False):
                 gobject.source_remove(self.autoupdateId)

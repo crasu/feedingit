@@ -1,0 +1,11 @@
+Preferences:
+------------
+Font Size for Article Listing: The size, in points, in which the article headings in the feed article list appear
+Font Size for Articles: The size, in points, in which the article text appears
+Expiry for Articles: The time, in hours, from the article published time, after which it will be removed if it has been read. If it is unread, it will be removed after double this amount of time. This does not apply to articles being received for the first time
+Display Orientation: The orientation, portrait or landscape, that the application windows will be oriented to. If automatic, it will be determined by the Maemo operating system
+Auto-update Interval: The interval time, in hours, from the last update after which all feeds will attempt to update if Auto-update Enabled is checked
+Auto-update Enabled: Enables/disables the auto-update of all feeds
+Image Caching Enabled: If checked, will store images to /home/user/.feedingit
+Proxy Support Enabled: If checked, will use the proxy server settings entered for the Maemo device or connection
+View Known Issues and Tips: Will open a browser window to the feedingit website with version-specific information

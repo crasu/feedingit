@@ -595,7 +595,7 @@ class DisplayFeed(hildon.StackableWindow):
         for id in self.feed.getIds():
             title = self.feed.getTitle(id)
             
-            esc_title = unescape(title).replace("<em>","").replace("</em>","")
+            esc_title = unescape(title).replace("<em>","").replace("</em>","").replace("<nobr>","").replace("</nobr>","").replace("<wbr>","")
             #title.replace("<em>","").replace("</em>","").replace("&amp;","&").replace("&mdash;", "-").replace("&#8217;", "'")
             button = gtk.Button(esc_title)
             button.set_alignment(0,0)
@@ -962,10 +962,10 @@ class FeedingIt:
         # Need to check for internet connection
         # If no internet connection, try again in 10 minutes:
         # gobject.timeout_add(int(5*3600000), self.automaticUpdate)
-        file = open("/home/user/.feedingit/feedingit_widget.log", "a")
-        from time import localtime, strftime
-        file.write("App: %s\n" % strftime("%a, %d %b %Y %H:%M:%S +0000", localtime()))
-        file.close()
+        #file = open("/home/user/.feedingit/feedingit_widget.log", "a")
+        #from time import localtime, strftime
+        #file.write("App: %s\n" % strftime("%a, %d %b %Y %H:%M:%S +0000", localtime()))
+        #file.close()
         self.button_update_clicked(None, None)
         return True
     
