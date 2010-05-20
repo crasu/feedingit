@@ -105,6 +105,7 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
         
         self.add(vbox)
         self.treeview.connect("row-activated", self.row_activated)
+        #self.treeview.connect("cursor-changed", self.cursor_changed)
         vbox.show_all()
         self.setupDbus()
         #gobject.timeout_add_seconds(30*60, self.update_list)
@@ -174,7 +175,7 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
                 for id in readItems.keys():
                     if readItems[id]==False:
                         countUnread = countUnread + 1
-                list.append([self.feed_list[key], countUnread, key])
+                list.append([self.feed_list[key][0:18], countUnread, key])
                 self.total += countUnread
             except:
                 pass

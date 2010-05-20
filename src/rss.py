@@ -25,7 +25,7 @@
 
 from os.path import isfile, isdir
 from shutil import rmtree
-from os import mkdir, remove
+from os import mkdir, remove, utime
 import pickle
 import md5
 import feedparser
@@ -58,11 +58,22 @@ def getId(string):
 
 class ImageHandler:
     def __init__(self, configdir):
-        self.configdir = configdir
-        self.images = {}
-        
-    def addImage(self, key, baseurl, url):
-        filename = self.configdir+key+".d/"+getId(url)
+        pass
+
+class Feed:
+    def __init__(self, uniqueId, name, url):
+        self.titles = []
+        self.entries = {}
+        self.ids = []
+        self.readItems = {}
+        self.name = name
+        self.url = url
+        self.countUnread = 0
+        self.updateTime = "Never"
+        self.uniqueId = uniqueId
+
+    def addImage(self, configdir, key, baseurl, url):
+        filename = configdir+key+".d/"+getId(url)
         if not isfile(filename):
             try:
                 #if url.startswith("http"):
@@ -76,38 +87,11 @@ class ImageHandler:
             except:
                 print "Could not download " + url
         else:
-            open(filename,"a").close()  # "Touch" the file
-        if filename in self.images:
-            self.images[filename] += 1
-        else:
-            self.images[filename] = 1
+            #open(filename,"a").close()  # "Touch" the file
+            file = open(filename,"a")
+            utime(filename, None)
+            file.close()
         return filename
-        
-    def removeImage(self, key, filename):
-        #filename = self.configdir+key+".d/"+getId(url)
-        try:
-            self.images[filename] -= 1
-        except:
-            self.images[filename] = 0 #Delete image
-        try:
-            if self.images[filename] == 0:
-                remove(filename) #os.remove
-                del self.images[filename]
-        except:
-            print "Could not remove image %s" % filename
-
-class Feed:
-    def __init__(self, uniqueId, name, url, imageHandler):
-        self.titles = []
-        self.entries = {}
-        self.ids = []
-        self.readItems = {}
-        self.name = name
-        self.url = url
-        self.countUnread = 0
-        self.updateTime = "Never"
-        self.uniqueId = uniqueId
-        self.imageHandler = imageHandler
 
     def editFeed(self, url):
         self.url = url
@@ -149,6 +133,8 @@ class Feed:
         expiry = float(expiryTime) * 3600.
         # Check if the parse was succesful (number of entries > 0, else do nothing)
         if len(tmp["entries"])>0:
+           if not isdir(configdir+self.uniqueId+".d"):
+               mkdir(configdir+self.uniqueId+".d")
            try:
                f = urllib2.urlopen(urljoin(tmp["feed"]["link"],"/favicon.ico"))
                data = f.read()
@@ -164,8 +150,7 @@ class Feed:
 
            #reversedEntries = self.getEntries()
            #reversedEntries.reverse()
-           if not isdir(configdir+self.uniqueId+".d"):
-               mkdir(configdir+self.uniqueId+".d")
+
            currentTime = time.time()
            tmpEntries = {}
            tmpIds = []
@@ -180,7 +165,7 @@ class Feed:
                except:
                    entry["link"] = ""
                tmpEntry = {"title":entry["title"], "content":self.extractContent(entry),
-                            "date":date, "dateTuple":dateTuple, "link":entry["link"], "images":[] }
+                            "date":date, "dateTuple":dateTuple, "link":entry["link"] }
                id = self.generateUniqueId(tmpEntry)
                
                #articleTime = time.mktime(self.entries[id]["dateTuple"])
@@ -191,9 +176,8 @@ class Feed:
                    if imageCache:
                       for img in images:
                           try:
-                            filename = self.imageHandler.addImage(self.uniqueId, baseurl, img['src'])
+                            filename = self.addImage(configdir, self.uniqueId, baseurl, img['src'])
                             img['src']=filename
-                            tmpEntry["images"].append(filename)
                           except:
                               print "Error downloading image %s" % img
                    tmpEntry["contentLink"] = configdir+self.uniqueId+".d/"+id+".html"
@@ -205,8 +189,15 @@ class Feed:
                    if id not in self.readItems:
                        self.readItems[id] = False
                else:
-                    tmpEntries[id] = self.entries[id]
-                    tmpIds.append(id)
+                   try:
+                       filename = configdir+self.uniqueId+".d/"+id+".html"
+                       file = open(filename,"a")
+                       utime(filename, None)
+                       file.close()
+                   except:
+                       pass
+                   tmpEntries[id] = self.entries[id]
+                   tmpIds.append(id)
             
            oldIds = self.ids[:]
            for entryId in oldIds:
@@ -245,6 +236,31 @@ class Feed:
            self.countUnread = tmpUnread
            self.updateTime = time.asctime()
            self.saveFeed(configdir)
+           from glob import glob
+           from os import stat
+           for file in glob(configdir+self.uniqueId+".d/*"):
+                #
+                stats = stat(file)
+                #
+                # put the two dates into matching format
+                #
+                lastmodDate = stats[8]
+                #
+                expDate = time.time()-expiry*3
+                # check if image-last-modified-date is outdated
+                #
+                if expDate > lastmodDate:
+                    #
+                    try:
+                        #
+                        #print 'Removing', file
+                        #
+                        remove(file) # commented out for testing
+                        #
+                    except OSError:
+                        #
+                        print 'Could not remove', file
+           
 
     def extractContent(self, entry):
         content = ""
@@ -345,9 +361,6 @@ class Feed:
         #try:
         if self.entries.has_key(id):
             entry = self.entries[id]
-            if entry.has_key("images"):
-                for img in entry["images"]:
-                    self.imageHandler.removeImage(self.uniqueId, img)
             
             if entry.has_key("contentLink"):
                 try:
@@ -425,9 +438,8 @@ class ArchivedArticles(Feed):
                     images = soup('img')
                     baseurl = entry["link"]
                     for img in images:
-                        filename = self.imageHandler.addImage(self.uniqueId, baseurl, img['src'])
+                        filename = self.addImage(self.uniqueId, baseurl, img['src'])
                         img['src']=filename
-                        entry["images"].append(filename)
                     entry["contentLink"] = configdir+self.uniqueId+".d/"+id+".html"
                     file = open(entry["contentLink"], "w")
                     file.write(soup.prettify())
@@ -476,12 +488,6 @@ class Listing:
             file.close()
         else:
             self.listOfFeeds = {getId("Slashdot"):{"title":"Slashdot", "url":"http://rss.slashdot.org/Slashdot/slashdot", "unread":0, "updateTime":"Never"}, }
-        try:
-            file = open(self.configdir+"images.pickle")
-            self.imageHandler = pickle.load(file)
-            file.close()
-        except:
-            self.imageHandler = ImageHandler(self.configdir)
         if self.listOfFeeds.has_key("font"):
             del self.listOfFeeds["font"]
         if self.listOfFeeds.has_key("feedingit-order"):
@@ -515,19 +521,21 @@ class Listing:
                 file.close()
                 try:
                     feed.uniqueId
-                    feed.imageHandler
                 except AttributeError:
                     feed.uniqueId = getId(feed.name)
-                    feed.imageHandler = self.imageHandler
+                try:
+                    del feed.imageHandler
+                except:
+                    pass
                 #feed.reloadUnread(self.configdir)
             else:
                 #print key
                 title = self.listOfFeeds[key]["title"]
                 url = self.listOfFeeds[key]["url"]
                 if key == "ArchivedArticles":
-                    feed = ArchivedArticles("ArchivedArticles", title, url, self.imageHandler)
+                    feed = ArchivedArticles("ArchivedArticles", title, url)
                 else:
-                    feed = Feed(getId(title), title, url, self.imageHandler)
+                    feed = Feed(getId(title), title, url)
             return feed
         
     def updateFeeds(self, expiryTime=24, proxy=None, imageCache=False):
@@ -555,6 +563,8 @@ class Listing:
             feed.reloadUnread(self.configdir)
         except:
             # If the feed file gets corrupted, we need to reset the feed.
+            import traceback
+            traceback.print_exc()
             import dbus
             bus = dbus.SessionBus()
             remote_object = bus.get_object("org.freedesktop.Notifications", # Connection name
@@ -619,9 +629,6 @@ class Listing:
         self.listOfFeeds["feedingit-order"] = self.sortedKeys
         file = open(self.configdir+"feeds.pickle", "w")
         pickle.dump(self.listOfFeeds, file)
-        file.close()
-        file = open(self.configdir+"images.pickle", "w")
-        pickle.dump(self.imageHandler, file)
         file.close()
         
     def moveUp(self, key):
