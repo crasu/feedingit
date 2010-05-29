@@ -165,7 +165,7 @@ class Feed:
                except:
                    entry["link"] = ""
                tmpEntry = {"title":entry["title"], "content":self.extractContent(entry),
-                            "date":date, "dateTuple":dateTuple, "link":entry["link"] }
+                            "date":date, "dateTuple":dateTuple, "link":entry["link"], "images":[] }
                id = self.generateUniqueId(tmpEntry)
                
                #articleTime = time.mktime(self.entries[id]["dateTuple"])
@@ -178,6 +178,7 @@ class Feed:
                           try:
                             filename = self.addImage(configdir, self.uniqueId, baseurl, img['src'])
                             img['src']=filename
+                            tmpEntry["images"].append(filename)
                           except:
                               print "Error downloading image %s" % img
                    tmpEntry["contentLink"] = configdir+self.uniqueId+".d/"+id+".html"
@@ -194,6 +195,10 @@ class Feed:
                        file = open(filename,"a")
                        utime(filename, None)
                        file.close()
+                       for image in self.entries[id]["images"]:
+                            file = open(image,"a")
+                            utime(image, None)
+                            file.close()
                    except:
                        pass
                    tmpEntries[id] = self.entries[id]
@@ -438,7 +443,7 @@ class ArchivedArticles(Feed):
                     images = soup('img')
                     baseurl = entry["link"]
                     for img in images:
-                        filename = self.addImage(self.uniqueId, baseurl, img['src'])
+                        filename = self.addImage(configdir, self.uniqueId, baseurl, img['src'])
                         img['src']=filename
                     entry["contentLink"] = configdir+self.uniqueId+".d/"+id+".html"
                     file = open(entry["contentLink"], "w")

@@ -52,6 +52,19 @@ class Config():
         
         vbox = gtk.VBox(False, 10)
         self.buttons = {}
+
+        button = hildon.Button(gtk.HILDON_SIZE_FINGER_HEIGHT, hildon.BUTTON_ARRANGEMENT_VERTICAL)
+        button.set_label("View Known Issues and Tips")
+        button.connect("clicked", self.button_tips_clicked)
+        button.set_alignment(0,0,1,1)
+        vbox.pack_start(button, expand=False)  
+
+        button = hildon.CheckButton(gtk.HILDON_SIZE_FINGER_HEIGHT)
+        button.set_label("Image Caching Enabled")
+        button.set_active(self.config["imageCache"])
+        button.connect("toggled", self.button_toggled, "imageCache")
+        vbox.pack_start(button, expand=False)      
+
         settings = ["fontSize", "artFontSize", "expiry", "orientation", "updateInterval",]
         for setting in settings:
             picker = hildon.PickerButton(gtk.HILDON_SIZE_FINGER_HEIGHT, hildon.BUTTON_ARRANGEMENT_VERTICAL)
@@ -65,15 +78,21 @@ class Config():
             vbox.pack_start(picker, expand=False)
         
         button = hildon.CheckButton(gtk.HILDON_SIZE_FINGER_HEIGHT)
-        button.set_label("Auto-update Enabled.")
+        button.set_label("Auto-update Enabled")
         button.set_active(self.config["autoupdate"])
         button.connect("toggled", self.button_toggled, "autoupdate")
         vbox.pack_start(button, expand=False)
 
         button = hildon.CheckButton(gtk.HILDON_SIZE_FINGER_HEIGHT)
-        button.set_label("Image Caching Enabled")
-        button.set_active(self.config["imageCache"])
-        button.connect("toggled", self.button_toggled, "imageCache")
+        button.set_label("Hide read feeds")
+        button.set_active(self.config["hidereadfeeds"])
+        button.connect("toggled", self.button_toggled, "hidereadfeeds")
+        vbox.pack_start(button, expand=False)
+
+        button = hildon.CheckButton(gtk.HILDON_SIZE_FINGER_HEIGHT)
+        button.set_label("Hide read articles")
+        button.set_active(self.config["hidereadarticles"])
+        button.connect("toggled", self.button_toggled, "hidereadarticles")
         vbox.pack_start(button, expand=False)
         
         button = hildon.CheckButton(gtk.HILDON_SIZE_FINGER_HEIGHT)
@@ -81,13 +100,6 @@ class Config():
         button.set_active(self.config["proxy"])
         button.connect("toggled", self.button_toggled, "proxy")
         vbox.pack_start(button, expand=False)
-        
-        button = hildon.Button(gtk.HILDON_SIZE_FINGER_HEIGHT, hildon.BUTTON_ARRANGEMENT_VERTICAL)
-        button.set_label("View Known Issues and Tips")
-        button.connect("clicked", self.button_tips_clicked)
-        button.set_alignment(0,0,1,1)
-        vbox.pack_start(button, expand=False)
-        
         
         panArea.add_with_viewport(vbox)
         
@@ -151,6 +163,12 @@ class Config():
             self.config["proxy"] = configParser.getboolean(section, "proxy")
         except:
             self.config["proxy"] = True
+        try:
+            self.config["hidereadfeeds"] = configParser.getboolean(section, "hidereadfeeds")
+            self.config["hidereadarticles"] = configParser.getboolean(section, "hidereadarticles")
+        except:
+            self.config["hidereadfeeds"] = False
+            self.config["hidereadarticles"] = False
         
     def saveConfig(self):
         configParser = RawConfigParser()
@@ -163,6 +181,8 @@ class Config():
         configParser.set(section, 'orientation', str(self.config["orientation"]))
         configParser.set(section, 'imageCache', str(self.config["imageCache"]))
         configParser.set(section, 'proxy', str(self.config["proxy"]))
+        configParser.set(section, 'hidereadfeeds', str(self.config["hidereadfeeds"]))
+        configParser.set(section, 'hidereadarticles', str(self.config["hidereadarticles"]))
 
         # Writing our configuration file
         file = open(self.configFilename, 'wb')
@@ -210,3 +230,7 @@ class Config():
             proxy = ProxyHandler( {"http":"http://%s:%s/"% (http,port)} )
             return (True, proxy)
         return (False, None)
+    def getHideReadFeeds(self):
+        return self.config["hidereadfeeds"]
+    def getHideReadArticles(self):
+        return self.config["hidereadarticles"]

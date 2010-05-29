@@ -1,3 +1,23 @@
+feedingit (0.7.0-0) unstable; urgency=low
+
+  * Added THP's patches (TreeView for feed and article listing, About dialog)
+  * Added Nelson's patch (Hide read feeds and articles options)
+  * Fixed error message when viewing un-downloaded Archived Article
+
+ -- Yves <yves@marcoz.org>  Sat, 29 May 2010 10:53:19 -0800
+
+feedingit (0.6.2-2) unstable; urgency=low
+
+  * Fixed image caching in Archived Articles
+
+ -- Yves <yves@marcoz.org>  Mon, 24 May 2010 19:57:19 -0800
+
+feedingit (0.6.2-1) unstable; urgency=low
+
+  * Image cache expiry is time-based (removed imageHandler in memory object)
+
+ -- Yves <yves@marcoz.org>  Tue, 19 May 2010 22:02:19 -0800
+
 feedingit (0.6.2-0) unstable; urgency=low
 
   * Added icons to feeds

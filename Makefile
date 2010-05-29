@@ -19,6 +19,8 @@ install:
 	install src/updatedbus.py ${DESTDIR}/opt/FeedingIt
 	install src/BeautifulSoup.py ${DESTDIR}/opt/FeedingIt
 	install src/feedingitdbus.py ${DESTDIR}/opt/FeedingIt
+	install src/aboutdialog.py ${DESTDIR}/opt/FeedingIt
+	install src/style.py ${DESTDIR}/opt/FeedingIt
 	install -d ${DESTDIR}/usr/share/applications/hildon
 	install src/FeedingIt.desktop ${DESTDIR}/usr/share/applications/hildon
 	install -d ${DESTDIR}/usr/share/icons/hicolor/48x48/apps/
