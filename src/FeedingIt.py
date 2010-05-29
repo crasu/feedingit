@@ -446,7 +446,7 @@ class DisplayArticle(hildon.StackableWindow):
         if contentLink.startswith("/home/user/"):
             self.view.open("file://" + contentLink)
         else:
-            self.view.load_html_string('This article has not been downloaded yet. Click <a href="%s">here</a> to view online.' % contentLink, "text/html", "utf-8", self.contentLink)
+            self.view.load_html_string('This article has not been downloaded yet. Click <a href="%s">here</a> to view online.' % contentLink, contentLink)
         self.view.connect("motion-notify-event", lambda w,ev: True)
         self.view.connect('load-started', self.load_started)
         self.view.connect('load-finished', self.load_finished)

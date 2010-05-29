@@ -1,3 +1,9 @@
+feedingit (0.7.0-1) unstable; urgency=low
+
+  * Fixed error message when viewing un-downloaded Archived Article
+
+ -- Yves <yves@marcoz.org>  Sat, 29 May 2010 10:53:19 -0800
+
 feedingit (0.7.0-0) unstable; urgency=low
 
   * Added THP's patches (TreeView for feed and article listing, About dialog)
