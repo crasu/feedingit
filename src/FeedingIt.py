@@ -82,7 +82,8 @@ FEED_COLUMN_MARKUP, FEED_COLUMN_KEY = range(2)
 
 import style
 
-MARKUP_TEMPLATE = '<span font_desc="%s" foreground="%s">%%s</span>'
+MARKUP_TEMPLATE= '<span font_desc="%s" foreground="%s">%%s</span>'
+MARKUP_TEMPLATE_ENTRY = '<span font_desc="%s %%s" foreground="%s">%%s</span>'
 
 # Build the markup template for the Maemo 5 text style
 head_font = style.get_font_desc('SystemFont')
@@ -95,14 +96,20 @@ active_color = style.get_color('ActiveTextColor')
 head = MARKUP_TEMPLATE % (head_font.to_string(), head_color.to_string())
 normal_sub = MARKUP_TEMPLATE % (sub_font.to_string(), sub_color.to_string())
 
+entry_head = MARKUP_TEMPLATE_ENTRY % (head_font.get_family(), head_color.to_string())
+entry_normal_sub = MARKUP_TEMPLATE_ENTRY % (sub_font.get_family(), sub_color.to_string())
+
 active_head = MARKUP_TEMPLATE % (head_font.to_string(), active_color.to_string())
 active_sub = MARKUP_TEMPLATE % (sub_font.to_string(), active_color.to_string())
+
+entry_active_head = MARKUP_TEMPLATE_ENTRY % (head_font.get_family(), active_color.to_string())
+entry_active_sub = MARKUP_TEMPLATE_ENTRY % (sub_font.get_family(), active_color.to_string())
 
 FEED_TEMPLATE = '\n'.join((head, normal_sub))
 FEED_TEMPLATE_UNREAD = '\n'.join((head, active_sub))
 
-ENTRY_TEMPLATE = head
-ENTRY_TEMPLATE_UNREAD = active_head
+ENTRY_TEMPLATE = entry_head
+ENTRY_TEMPLATE_UNREAD = entry_active_head
 
 ##
 # Removes HTML or XML character references and entities from a text string.
@@ -647,28 +654,56 @@ class DisplayFeed(hildon.StackableWindow):
         self.pannableFeed.set_property('hscrollbar-policy', gtk.POLICY_NEVER)
 
         self.feedItems = gtk.ListStore(str, str)
-        self.feedList = gtk.TreeView(self.feedItems)
-        self.feedList.connect('row-activated', self.on_feedList_row_activated)
-        self.pannableFeed.add(self.feedList)
+        #self.feedList = gtk.TreeView(self.feedItems)
+        self.feedList = hildon.GtkTreeView(gtk.HILDON_UI_MODE_NORMAL)
+        selection = self.feedList.get_selection()
+        selection.set_mode(gtk.SELECTION_NONE)
+        #selection.connect("changed", lambda w: True)
+        
+        self.feedList.set_model(self.feedItems)
+        self.feedList.set_grid_lines(gtk.TREE_VIEW_GRID_LINES_HORIZONTAL)
+
+        
+        self.feedList.set_hover_selection(False)
+        #self.feedList.set_property('enable-grid-lines', True)
+        #self.feedList.set_property('hildon-mode', 1)
+        #self.pannableFeed.connect("motion-notify-event", lambda w,ev: True)
+        
+        #self.feedList.connect('row-activated', self.on_feedList_row_activated)
+
+        self.feedList.connect('hildon-row-tapped', self.on_feedList_row_activated)
+        vbox= gtk.VBox(False, 10)
+        vbox.pack_start(self.feedList)
+        
+        self.pannableFeed.add_with_viewport(vbox)
 
         self.markup_renderer = gtk.CellRendererText()
         self.markup_renderer.set_property('wrap-mode', pango.WRAP_WORD_CHAR)
         self.markup_renderer.set_property('wrap-width', 780)
+        self.markup_renderer.set_property('ypad', 5)
+        self.markup_renderer.set_property('xpad', 5)
         markup_column = gtk.TreeViewColumn('', self.markup_renderer, \
                 markup=FEED_COLUMN_MARKUP)
         self.feedList.append_column(markup_column)
 
         #self.pannableFeed.set_property("mov-mode", hildon.MOVEMENT_MODE_BOTH)
-
+        hideReadArticles = self.config.getHideReadArticles()
         for id in self.feed.getIds():
-            if not ( self.feed.isEntryRead(id) and self.config.getHideReadArticles() ):
+            isRead = False
+            try:
+                isRead = self.feed.isEntryRead(id)
+            except:
+                pass
+            if not ( isRead and hideReadArticles ):
+            #if not ( self.feed.isEntryRead(id) and self.config.getHideReadArticles() ):
                 #title = self.feed.getTitle(id)
                 title = self.fix_title(self.feed.getTitle(id))
     
-                if self.feed.isEntryRead(id):
-                    markup = ENTRY_TEMPLATE % title
+                #if self.feed.isEntryRead(id):
+                if isRead:
+                    markup = ENTRY_TEMPLATE % (self.config.getFontSize(), title)
                 else:
-                    markup = ENTRY_TEMPLATE_UNREAD % title
+                    markup = ENTRY_TEMPLATE_UNREAD % (self.config.getFontSize(), title)
     
                 self.feedItems.append((markup, id))
 
@@ -679,12 +714,16 @@ class DisplayFeed(hildon.StackableWindow):
         self.pannableFeed.destroy()
         #self.remove(self.pannableFeed)
 
-    def on_feedList_row_activated(self, treeview, path, column):
+    def on_feedList_row_activated(self, treeview, path): #, column):
+        selection = self.feedList.get_selection()
+        selection.set_mode(gtk.SELECTION_SINGLE)
+        self.feedList.get_selection().select_path(path)
         model = treeview.get_model()
         iter = model.get_iter(path)
         key = model.get_value(iter, FEED_COLUMN_KEY)
         # Emulate legacy "button_clicked" call via treeview
-        self.button_clicked(treeview, key)
+        gobject.idle_add(self.button_clicked, treeview, key)
+        #return True
 
     def button_clicked(self, button, index, previous=False, next=False):
         #newDisp = DisplayArticle(self.feedTitle, self.feed.getArticle(index), self.feed.getLink(index), index, self.key, self.listing, self.config)
@@ -729,7 +768,7 @@ class DisplayFeed(hildon.StackableWindow):
             k = self.feedItems.get_value(it, FEED_COLUMN_KEY)
             if k == key:
                 title = self.fix_title(self.feed.getTitle(key))
-                markup = ENTRY_TEMPLATE % title
+                markup = ENTRY_TEMPLATE % (self.config.getFontSize(), title)
                 self.feedItems.set_value(it, FEED_COLUMN_MARKUP, markup)
                 break
             it = self.feedItems.iter_next(it)
@@ -737,14 +776,44 @@ class DisplayFeed(hildon.StackableWindow):
     def nextArticle(self, object, index):
         self.mark_item_read(index)
         id = self.feed.getNextId(index)
-        self.button_clicked(object, id, next=True)
+        if self.config.getHideReadArticles():
+            isRead = False
+            try:
+                isRead = self.feed.isEntryRead(id)
+            except:
+                pass
+            while isRead and id != index:
+                id = self.feed.getNextId(id)
+                isRead = False
+                try:
+                       isRead = self.feed.isEntryRead(id)
+                except:
+                       pass
+        if id != index:
+            self.button_clicked(object, id, next=True)
 
     def previousArticle(self, object, index):
         self.mark_item_read(index)
         id = self.feed.getPreviousId(index)
-        self.button_clicked(object, id, previous=True)
+        if self.config.getHideReadArticles():
+            isRead = False
+            try:
+                isRead = self.feed.isEntryRead(id)
+            except:
+                pass
+            while isRead and id != index:
+                id = self.feed.getPreviousId(id)
+                isRead = False
+                try:
+                       isRead = self.feed.isEntryRead(id)
+                except:
+                       pass
+        if id != index:
+            self.button_clicked(object, id, previous=True)
 
     def onArticleClosed(self, object, index):
+        selection = self.feedList.get_selection()
+        selection.set_mode(gtk.SELECTION_NONE)
         self.mark_item_read(index)
 
     def onArticleDeleted(self, object, index):
@@ -784,25 +853,11 @@ class FeedingIt:
         self.window.set_title(__appname__)
         hildon.hildon_gtk_window_set_progress_indicator(self.window, 1)
         self.mainVbox = gtk.VBox(False,10)
+        
+        self.introLabel = gtk.Label("Loading...")
 
-        self.pannableListing = hildon.PannableArea()
-        self.mainVbox.pack_start(self.pannableListing)
-
-        self.feedItems = gtk.ListStore(gtk.gdk.Pixbuf, str, str)
-        self.feedList = gtk.TreeView(self.feedItems)
-        self.feedList.connect('row-activated', self.on_feedList_row_activated)
-        self.pannableListing.add(self.feedList)
-
-        icon_renderer = gtk.CellRendererPixbuf()
-        icon_renderer.set_property('width', LIST_ICON_SIZE + 2*LIST_ICON_BORDER)
-        icon_column = gtk.TreeViewColumn('', icon_renderer, \
-                pixbuf=COLUMN_ICON)
-        self.feedList.append_column(icon_column)
-
-        markup_renderer = gtk.CellRendererText()
-        markup_column = gtk.TreeViewColumn('', markup_renderer, \
-                markup=COLUMN_MARKUP)
-        self.feedList.append_column(markup_column)
+        
+        self.mainVbox.pack_start(self.introLabel)
 
         self.window.add(self.mainVbox)
         self.window.show_all()
@@ -812,7 +867,7 @@ class FeedingIt:
     def createWindow(self):
         self.app_lock = get_lock("app_lock")
         if self.app_lock == None:
-            self.pannableListing.set_label("Update in progress, please wait.")
+            self.introLabel.set_label("Update in progress, please wait.")
             gobject.timeout_add_seconds(3, self.createWindow)
             return False
         self.listing = Listing(CONFIGDIR)
@@ -864,8 +919,27 @@ class FeedingIt:
         self.window.set_app_menu(menu)
         menu.show_all()
         
-        self.feedWindow = hildon.StackableWindow()
-        self.articleWindow = hildon.StackableWindow()
+        #self.feedWindow = hildon.StackableWindow()
+        #self.articleWindow = hildon.StackableWindow()
+        self.introLabel.destroy()
+        self.pannableListing = hildon.PannableArea()
+        self.feedItems = gtk.ListStore(gtk.gdk.Pixbuf, str, str)
+        self.feedList = gtk.TreeView(self.feedItems)
+        self.feedList.connect('row-activated', self.on_feedList_row_activated)
+        self.pannableListing.add(self.feedList)
+
+        icon_renderer = gtk.CellRendererPixbuf()
+        icon_renderer.set_property('width', LIST_ICON_SIZE + 2*LIST_ICON_BORDER)
+        icon_column = gtk.TreeViewColumn('', icon_renderer, \
+                pixbuf=COLUMN_ICON)
+        self.feedList.append_column(icon_column)
+
+        markup_renderer = gtk.CellRendererText()
+        markup_column = gtk.TreeViewColumn('', markup_renderer, \
+                markup=COLUMN_MARKUP)
+        self.feedList.append_column(markup_column)
+        self.mainVbox.pack_start(self.pannableListing)
+        self.mainVbox.show_all()
 
         self.displayListing()
         self.autoupdate = False
@@ -1017,7 +1091,10 @@ class FeedingIt:
         del self.app_lock
 
     def prefsClosed(self, *widget):
-        self.orientation.set_mode(self.config.getOrientation())
+        try:
+            self.orientation.set_mode(self.config.getOrientation())
+        except:
+            pass
         self.displayListing()
         self.checkAutoUpdate()
 

@@ -9,7 +9,7 @@ status)
 dbus)
 	cd /opt/FeedingIt
 	#cp feedingit_status.desktop /usr/share/applications/hildon-status-menu/
-	python2.5 update_feeds.py
+	nice python2.5 update_feeds.py
 	;;
 *)
     cd /opt/FeedingIt

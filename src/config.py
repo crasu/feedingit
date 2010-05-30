@@ -133,7 +133,7 @@ class Config():
         current_selection = selector.get_current_text()
         if current_selection:
             self.config[setting] = current_selection
-        gobject.idle_add(self.updateButton, setting)
+        idle_add(self.updateButton, setting)
         self.saveConfig()
         
     def updateButton(self, setting):

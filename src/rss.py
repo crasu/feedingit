@@ -71,6 +71,8 @@ class Feed:
         self.countUnread = 0
         self.updateTime = "Never"
         self.uniqueId = uniqueId
+        self.etag = None
+        self.modified = None
 
     def addImage(self, configdir, key, baseurl, url):
         filename = configdir+key+".d/"+getId(url)
@@ -127,9 +129,17 @@ class Feed:
     def updateFeed(self, configdir, expiryTime=24, proxy=None, imageCache=False):
         # Expiry time is in hours
         if proxy == None:
-            tmp=feedparser.parse(self.url)
+            tmp=feedparser.parse(self.url, etag = self.etag, modified = self.modified)
         else:
-            tmp=feedparser.parse(self.url, handlers = [proxy])
+            tmp=feedparser.parse(self.url, etag = self.etag, modified = self.modified, handlers = [proxy])
+	try:
+            self.etag = tmp["etag"]
+	except KeyError:
+            pass
+	try:
+            self.modified = tmp["modified"]
+	except KeyError:
+            pass
         expiry = float(expiryTime) * 3600.
         # Check if the parse was succesful (number of entries > 0, else do nothing)
         if len(tmp["entries"])>0:
@@ -144,8 +154,9 @@ class Feed:
                outf.close()
                del data
            except:
-                import traceback
-                traceback.print_exc()
+               #import traceback
+               #traceback.print_exc()
+                pass
 
 
            #reversedEntries = self.getEntries()
@@ -532,6 +543,14 @@ class Listing:
                     del feed.imageHandler
                 except:
                     pass
+		try:
+		    feed.etag
+		except AttributeError:
+		    feed.etag = None
+		try:
+		    feed.modified
+		except AttributeError:
+		    feed.modified = None
                 #feed.reloadUnread(self.configdir)
             else:
                 #print key
