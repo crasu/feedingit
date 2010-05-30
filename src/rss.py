@@ -492,7 +492,7 @@ class Listing:
             self.listOfFeeds = pickle.load(file)
             file.close()
         else:
-            self.listOfFeeds = {getId("Slashdot"):{"title":"Slashdot", "url":"http://rss.slashdot.org/Slashdot/slashdot", "unread":0, "updateTime":"Never"}, }
+            self.listOfFeeds = {getId("Maemo News"):{"title":"Maemo News", "url":"http://maemo.org/news/items.xml", "unread":0, "updateTime":"Never"}, }
         if self.listOfFeeds.has_key("font"):
             del self.listOfFeeds["font"]
         if self.listOfFeeds.has_key("feedingit-order"):

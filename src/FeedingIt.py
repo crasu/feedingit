@@ -818,8 +818,11 @@ class FeedingIt:
         self.listing = Listing(CONFIGDIR)
         
         self.downloadDialog = False
-        self.orientation = FremantleRotation(__appname__, main_window=self.window, app=self)
-        self.orientation.set_mode(self.config.getOrientation())
+        try:
+            self.orientation = FremantleRotation(__appname__, main_window=self.window, app=self)
+            self.orientation.set_mode(self.config.getOrientation())
+        except:
+            print "Could not start rotation manager"
         
         menu = hildon.AppMenu()
         # Create a button and add it to the menu
