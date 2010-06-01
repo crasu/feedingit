@@ -38,9 +38,12 @@ from os import environ, remove
 bus = dbus.bus.BusConnection(environ["DBUS_SESSION_BUS_ADDRESS"])
 from os.path import isfile
 
-color_style = gtk.rc_get_style_by_paths(gtk.settings_get_default() , 'GtkButton', 'osso-logical-colors', gtk.Button)
+settings = gtk.settings_get_default()
+color_style = gtk.rc_get_style_by_paths( settings, 'GtkButton', 'osso-logical-colors', gtk.Button)
 active_color = color_style.lookup_color('ActiveTextColor')
 default_color = color_style.lookup_color('DefaultTextColor')
+font_desc = gtk.rc_get_style_by_paths(settings, 'HomeSystemFont', None, None).font_desc
+
 del color_style
 
 CONFIGDIR="/home/user/.feedingit/"
@@ -50,6 +53,13 @@ SOURCE=CONFIGDIR + "source"
 #import ctypes
 #libc = ctypes.CDLL('libc.so.6')
 #libc.printf('Hello world!')
+
+def get_font_desc(logicalfontname):
+    settings = gtk.settings_get_default()
+    font_style = gtk.rc_get_style_by_paths(settings, logicalfontname, \
+            None, None)
+    font_desc = font_style.font_desc
+    return font_desc
 
 class FeedingItHomePlugin(hildondesktop.HomePluginItem):
     def __init__(self):
@@ -79,9 +89,10 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
         self.label1 = self.button.child.child.get_children()[0].get_children()[0]
         self.label2 = self.button.child.child.get_children()[0].get_children()[1]
         self.label1.modify_fg(gtk.STATE_INSENSITIVE, default_color)
+        self.label1.modify_font(font_desc)
         self.label2.modify_fg(gtk.STATE_INSENSITIVE, active_color)
         icon_theme = gtk.icon_theme_get_default()
-        pixbuf = icon_theme.load_icon("feedingit", 48, gtk.ICON_LOOKUP_USE_BUILTIN )
+        pixbuf = icon_theme.load_icon("feedingit", 32, gtk.ICON_LOOKUP_USE_BUILTIN )
         image = gtk.Image()
         image.set_from_pixbuf(pixbuf)
         self.button.set_image(image)
@@ -96,15 +107,21 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
         #    self.treestore.append([feed, "0"])
         self.treeview = gtk.TreeView()
         self.update_list()
-        self.treeview.append_column(gtk.TreeViewColumn('Feed Name', gtk.CellRendererText(), text = 0))
-        self.treeview.append_column(gtk.TreeViewColumn('Unread Items', gtk.CellRendererText(), text = 1))
+        name_renderer = gtk.CellRendererText()
+        name_renderer.set_property("font-desc", font_desc)
+        unread_renderer = gtk.CellRendererText()
+        unread_renderer.set_property("font-desc", font_desc)        
+        self.treeview.append_column(gtk.TreeViewColumn('Feed Name', name_renderer, text = 0))
+        self.treeview.append_column(gtk.TreeViewColumn('Unread Items', unread_renderer, text = 1))
+        selection = self.treeview.get_selection()
+        #selection.set_mode(gtk.SELECTION_NONE)
         #self.treeview.get_selection().set_mode(gtk.SELECTION_NONE)
         #hildon.hildon_gtk_tree_view_set_ui_mode(self.treeview, gtk.HILDON_UI_MODE_NORMAL)
         
         vbox.pack_start(self.treeview)
         
         self.add(vbox)
-        self.treeview.connect("row-activated", self.row_activated)
+        self.treeview.connect("hildon-row-tapped", self.row_activated)
         #self.treeview.connect("cursor-changed", self.cursor_changed)
         vbox.show_all()
         self.setupDbus()
@@ -145,7 +162,7 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
         else:
             self.button.set_value("")
 
-    def row_activated(self, treeview, treepath, column):
+    def row_activated(self, treeview, treepath): #, column):
         (model, iter) = self.treeview.get_selection().get_selected()
         key = model.get_value(iter, 2)
         # Create an object that will proxy for a particular remote object.
@@ -183,7 +200,6 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
         for item in list[0:8]:
             treestore.append(item)
         self.treeview.set_model(treestore)
-        self.treeview.get_selection().unselect_all()
         if self.total > oldtotal:
             self.update_label("%s Unread" %str(self.total), "%s more articles" %str(self.total-oldtotal))
         else:

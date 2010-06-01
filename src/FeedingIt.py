@@ -671,7 +671,6 @@ class DisplayFeed(hildon.StackableWindow):
         
         #self.feedList.connect('row-activated', self.on_feedList_row_activated)
 
-        self.feedList.connect('hildon-row-tapped', self.on_feedList_row_activated)
         vbox= gtk.VBox(False, 10)
         vbox.pack_start(self.feedList)
         
@@ -688,6 +687,7 @@ class DisplayFeed(hildon.StackableWindow):
 
         #self.pannableFeed.set_property("mov-mode", hildon.MOVEMENT_MODE_BOTH)
         hideReadArticles = self.config.getHideReadArticles()
+        hasArticle = False
         for id in self.feed.getIds():
             isRead = False
             try:
@@ -706,6 +706,12 @@ class DisplayFeed(hildon.StackableWindow):
                     markup = ENTRY_TEMPLATE_UNREAD % (self.config.getFontSize(), title)
     
                 self.feedItems.append((markup, id))
+                hasArticle = True
+        if hasArticle:
+            self.feedList.connect('hildon-row-tapped', self.on_feedList_row_activated)
+        else:
+            markup = ENTRY_TEMPLATE % (self.config.getFontSize(), "No Articles To Display")
+            self.feedItems.append((markup, ""))
 
         self.add(self.pannableFeed)
         self.show_all()
@@ -1061,7 +1067,9 @@ class FeedingIt:
         model = treeview.get_model()
         iter = model.get_iter(path)
         key = model.get_value(iter, COLUMN_KEY)
-
+        self.openFeed(key)
+            
+    def openFeed(self, key):
         try:
             self.feed_lock
         except:
@@ -1071,6 +1079,7 @@ class FeedingIt:
                     self.listing.getFeedTitle(key), key, \
                     self.config, self.updateDbusHandler)
             self.disp.connect("feed-closed", self.onFeedClosed)
+        
 
     def onFeedClosed(self, object, key):
         #self.listing.saveConfig()
