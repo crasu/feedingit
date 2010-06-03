@@ -238,7 +238,12 @@ class DownloadBar(gtk.ProgressBar):
             install_opener(opener)
 
             if self.total>0:
-                self.set_text("Updating...")
+                # In preparation for i18n/l10n
+                def N_(a, b, n):
+                    return (a if n == 1 else b)
+
+                self.set_text(N_('Updating %d feed', 'Updating %d feeds', self.total) % self.total)
+
                 self.fraction = 0
                 self.set_fraction(self.fraction)
                 self.show_all()
