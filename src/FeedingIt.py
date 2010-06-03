@@ -903,7 +903,7 @@ class FeedingIt:
         menu.append(button)
 
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
-        button.set_label("Preferences")
+        button.set_label("Settings")
         button.connect("clicked", self.button_preferences_clicked)
         menu.append(button)
        
