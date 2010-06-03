@@ -493,22 +493,22 @@ class DisplayArticle(hildon.StackableWindow):
         menu = hildon.AppMenu()
         # Create a button and add it to the menu
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
-        button.set_label("Allow Horizontal Scrolling")
+        button.set_label("Allow horizontal scrolling")
         button.connect("clicked", self.horiz_scrolling_button)
         menu.append(button)
         
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
-        button.set_label("Open in Browser")
+        button.set_label("Open in browser")
         button.connect("clicked", self._signal_link_clicked, self.feed.getExternalLink(self.id))
         menu.append(button)
         
         if key == "ArchivedArticles":
             button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
-            button.set_label("Remove from Archived Articles")
+            button.set_label("Remove from archived articles")
             button.connect("clicked", self.remove_archive_button)
         else:
             button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
-            button.set_label("Add to Archived Articles")
+            button.set_label("Add to archived articles")
             button.connect("clicked", self.archive_button)
         menu.append(button)
         
@@ -624,18 +624,18 @@ class DisplayFeed(hildon.StackableWindow):
         
         menu = hildon.AppMenu()
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
-        button.set_label("Update Feed")
+        button.set_label("Update feed")
         button.connect("clicked", self.button_update_clicked)
         menu.append(button)
         
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
-        button.set_label("Mark All As Read")
+        button.set_label("Mark all as read")
         button.connect("clicked", self.buttonReadAllClicked)
         menu.append(button)
         
         if key=="ArchivedArticles":
             button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
-            button.set_label("Purge Read Articles")
+            button.set_label("Delete read articles")
             button.connect("clicked", self.buttonPurgeArticles)
             menu.append(button)
         
@@ -907,12 +907,12 @@ class FeedingIt:
         menu = hildon.AppMenu()
         # Create a button and add it to the menu
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
-        button.set_label("Update All Feeds")
+        button.set_label("Update feeds")
         button.connect("clicked", self.button_update_clicked, "All")
         menu.append(button)
         
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
-        button.set_label("Mark All As Read")
+        button.set_label("Mark all as read")
         button.connect("clicked", self.button_markAll)
         menu.append(button)
         
