@@ -231,12 +231,11 @@ class DownloadBar(gtk.ProgressBar):
             (use_proxy, proxy) = self.config.getProxy()
             if use_proxy:
                 opener = build_opener(proxy)
-                opener.addheaders = [('User-agent', USER_AGENT)]
-                install_opener(opener)
             else:
                 opener = build_opener()
-                opener.addheaders = [('User-agent', USER_AGENT)]
-                install_opener(opener)
+
+            opener.addheaders = [('User-agent', USER_AGENT)]
+            install_opener(opener)
 
             if self.total>0:
                 self.set_text("Updating...")
