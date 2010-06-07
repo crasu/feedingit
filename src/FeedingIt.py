@@ -657,7 +657,7 @@ class DisplayFeed(hildon.StackableWindow):
 
         # Fix up the column width for wrapping the text when the window is
         # resized (i.e. orientation changed)
-        self.markup_renderer.set_property('wrap-width', event.width-10)
+        self.markup_renderer.set_property('wrap-width', event.width-20)  
 
     def destroyWindow(self, *args):
         #self.feed.saveUnread(CONFIGDIR)
@@ -701,7 +701,8 @@ class DisplayFeed(hildon.StackableWindow):
 
         self.markup_renderer = gtk.CellRendererText()
         self.markup_renderer.set_property('wrap-mode', pango.WRAP_WORD_CHAR)
-        self.markup_renderer.set_property('wrap-width', 780)
+        (width, height) = self.get_size()
+        self.markup_renderer.set_property('wrap-width', width-20)
         self.markup_renderer.set_property('ypad', 5)
         self.markup_renderer.set_property('xpad', 5)
         markup_column = gtk.TreeViewColumn('', self.markup_renderer, \

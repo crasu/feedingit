@@ -57,7 +57,7 @@ class Config():
         self.window = gtk.Dialog("Settings", self.parent)
         save_button = self.window.add_button(gtk.STOCK_SAVE, gtk.RESPONSE_OK)
         save_button.connect('clicked', self.on_save_button_clicked)
-        self.window.set_default_size(-1, 600)
+        #self.window.set_default_size(-1, 600)
         panArea = hildon.PannableArea()
         
         vbox = gtk.VBox(False, 2)
@@ -130,6 +130,7 @@ class Config():
         self.window.vbox.add(panArea)        
         self.window.connect("destroy", self.onExit)
         #self.window.add(self.vbox)
+        self.window.set_default_size(-1, 600)
         self.window.show_all()
         return self.window
 
