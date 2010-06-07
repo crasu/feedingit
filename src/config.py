@@ -30,7 +30,7 @@ from gobject import idle_add
 from gconf import client_get_default
 from urllib2 import ProxyHandler
 
-VERSION = "0.6.1"
+VERSION = "48"
 
 section = "FeedingIt"
 ranges = { "updateInterval":[0.5, 1, 2, 4, 12, 24], "expiry":[24, 48, 72], "fontSize":range(12,24), "orientation":["Automatic", "Landscape", "Portrait"], "artFontSize":[10, 12, 14, 16, 18, 20]}
@@ -114,7 +114,7 @@ class Config():
         bus = dbus.SessionBus()
         proxy = bus.get_object("com.nokia.osso_browser", "/com/nokia/osso_browser/request")
         iface = dbus.Interface(proxy, 'com.nokia.osso_browser')
-        iface.open_new_window("http://feedingit.marcoz.org/%s.html" % VERSION)
+        iface.open_new_window("http://feedingit.marcoz.org/news/?page_id=%s" % VERSION)
 
     def onExit(self, *widget):
         self.saveConfig()

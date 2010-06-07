@@ -132,13 +132,13 @@ class Feed:
             tmp=feedparser.parse(self.url, etag = self.etag, modified = self.modified)
         else:
             tmp=feedparser.parse(self.url, etag = self.etag, modified = self.modified, handlers = [proxy])
-	try:
+        try:
             self.etag = tmp["etag"]
-	except KeyError:
+        except KeyError:
             pass
-	try:
+        try:
             self.modified = tmp["modified"]
-	except KeyError:
+        except KeyError:
             pass
         expiry = float(expiryTime) * 3600.
         # Check if the parse was succesful (number of entries > 0, else do nothing)
@@ -543,14 +543,14 @@ class Listing:
                     del feed.imageHandler
                 except:
                     pass
-		try:
-		    feed.etag
-		except AttributeError:
-		    feed.etag = None
-		try:
-		    feed.modified
-		except AttributeError:
-		    feed.modified = None
+                try:
+                    feed.etag
+                except AttributeError:
+                    feed.etag = None
+                try:
+                    feed.modified
+                except AttributeError:
+                    feed.modified = None
                 #feed.reloadUnread(self.configdir)
             else:
                 #print key
