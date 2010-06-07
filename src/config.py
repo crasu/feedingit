@@ -34,8 +34,8 @@ VERSION = "48"
 
 section = "FeedingIt"
 ranges = { "updateInterval":[0.5, 1, 2, 4, 12, 24], "expiry":[24, 48, 72], "fontSize":range(12,24), "orientation":["Automatic", "Landscape", "Portrait"], "artFontSize":[10, 12, 14, 16, 18, 20]}
-titles = {"updateInterval":"Auto-update Interval", "expiry":"Expiry For Articles", "fontSize":"Font Size For Article Listing", "orientation":"Display Orientation", "artFontSize":"Font Size For Articles"}
-subtitles = {"updateInterval":"Update every %s hours", "expiry":"Delete articles after %s hours", "fontSize":"%s pixels", "orientation":"%s", "artFontSize":"%s pixels"}
+titles = {"updateInterval":"Auto-update interval", "expiry":"Delete articles", "fontSize":"List font size", "orientation":"Display orientation", "artFontSize":"Article font size"}
+subtitles = {"updateInterval":"Every %s hours", "expiry":"After %s hours", "fontSize":"%s pixels", "orientation":"%s", "artFontSize":"%s pixels"}
 
 class Config():
     def __init__(self, parent, configFilename):
@@ -43,30 +43,33 @@ class Config():
         self.parent = parent
         # Load config
         self.loadConfig()
-        
+
+        # Backup current settings for later restore
+        self.config_backup = dict(self.config)
+        self.do_restore_backup = True
+
+    def on_save_button_clicked(self, button):
+        self.do_restore_backup = False
+        self.window.destroy()
+
     def createDialog(self):
         
-        self.window = gtk.Dialog("Preferences", self.parent)
+        self.window = gtk.Dialog("Settings", self.parent)
+        save_button = self.window.add_button(gtk.STOCK_SAVE, gtk.RESPONSE_OK)
+        save_button.connect('clicked', self.on_save_button_clicked)
         self.window.set_default_size(-1, 600)
         panArea = hildon.PannableArea()
         
-        vbox = gtk.VBox(False, 10)
+        vbox = gtk.VBox(False, 2)
         self.buttons = {}
 
-        button = hildon.Button(gtk.HILDON_SIZE_FINGER_HEIGHT, hildon.BUTTON_ARRANGEMENT_VERTICAL)
-        button.set_label("View Known Issues and Tips")
-        button.connect("clicked", self.button_tips_clicked)
-        button.set_alignment(0,0,1,1)
-        vbox.pack_start(button, expand=False)  
+        def heading(text):
+            l = gtk.Label()
+            l.set_size_request(-1, 6)
+            vbox.pack_start(l, expand=False)
+            vbox.pack_start(gtk.Frame(text), expand=False)
 
-        button = hildon.CheckButton(gtk.HILDON_SIZE_FINGER_HEIGHT)
-        button.set_label("Image Caching Enabled")
-        button.set_active(self.config["imageCache"])
-        button.connect("toggled", self.button_toggled, "imageCache")
-        vbox.pack_start(button, expand=False)      
-
-        settings = ["fontSize", "artFontSize", "expiry", "orientation", "updateInterval",]
-        for setting in settings:
+        def add_setting(setting):
             picker = hildon.PickerButton(gtk.HILDON_SIZE_FINGER_HEIGHT, hildon.BUTTON_ARRANGEMENT_VERTICAL)
             selector = self.create_selector(ranges[setting], setting)
             picker.set_selector(selector)
@@ -76,13 +79,17 @@ class Config():
             picker.set_alignment(0,0,1,1)
             self.buttons[setting] = picker
             vbox.pack_start(picker, expand=False)
-        
-        button = hildon.CheckButton(gtk.HILDON_SIZE_FINGER_HEIGHT)
-        button.set_label("Auto-update Enabled")
-        button.set_active(self.config["autoupdate"])
-        button.connect("toggled", self.button_toggled, "autoupdate")
-        vbox.pack_start(button, expand=False)
 
+        button = hildon.Button(gtk.HILDON_SIZE_FINGER_HEIGHT, hildon.BUTTON_ARRANGEMENT_VERTICAL)
+        button.set_label("View Known Issues and Tips")
+        button.connect("clicked", self.button_tips_clicked)
+        button.set_alignment(0,0,1,1)
+        vbox.pack_start(button, expand=False)  
+
+        heading('Display')
+        add_setting('fontSize')
+        add_setting('artFontSize')
+        add_setting('orientation')
         button = hildon.CheckButton(gtk.HILDON_SIZE_FINGER_HEIGHT)
         button.set_label("Hide read feeds")
         button.set_active(self.config["hidereadfeeds"])
@@ -94,9 +101,26 @@ class Config():
         button.set_active(self.config["hidereadarticles"])
         button.connect("toggled", self.button_toggled, "hidereadarticles")
         vbox.pack_start(button, expand=False)
-        
+
+
+        heading('Updating')
         button = hildon.CheckButton(gtk.HILDON_SIZE_FINGER_HEIGHT)
-        button.set_label("Proxy Support Enabled")
+        button.set_label("Automatically update feeds")
+        button.set_active(self.config["autoupdate"])
+        button.connect("toggled", self.button_toggled, "autoupdate")
+        vbox.pack_start(button, expand=False)
+        add_setting('updateInterval')
+        add_setting('expiry')
+
+        heading('Network')
+        button = hildon.CheckButton(gtk.HILDON_SIZE_FINGER_HEIGHT)
+        button.set_label('Cache images')
+        button.set_active(self.config["imageCache"])
+        button.connect("toggled", self.button_toggled, "imageCache")
+        vbox.pack_start(button, expand=False)      
+
+        button = hildon.CheckButton(gtk.HILDON_SIZE_FINGER_HEIGHT)
+        button.set_label("Use HTTP proxy")
         button.set_active(self.config["proxy"])
         button.connect("toggled", self.button_toggled, "proxy")
         vbox.pack_start(button, expand=False)
@@ -117,6 +141,12 @@ class Config():
         iface.open_new_window("http://feedingit.marcoz.org/news/?page_id=%s" % VERSION)
 
     def onExit(self, *widget):
+        # When the dialog is closed without hitting
+        # the "Save" button, restore the configuration
+        if self.do_restore_backup:
+            print 'Restoring configuration'
+            self.config = self.config_backup
+
         self.saveConfig()
         self.window.destroy()
 

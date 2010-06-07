@@ -132,17 +132,17 @@ class GetOpmlData():
         return []
 
     def downloadFile(self):
-        dlg = gtk.Dialog("OPML Import", self.parent, gtk.DIALOG_DESTROY_WITH_PARENT,
-                     (gtk.STOCK_OK, gtk.RESPONSE_OK,
+        dlg = gtk.Dialog("Import OPML from web", self.parent, gtk.DIALOG_DESTROY_WITH_PARENT,
+                     ('Import', gtk.RESPONSE_OK,
                       gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL))
-        lbl = gtk.Label("Enter the URL of the OPML file:")
-        lbl.show()
-        dlg.vbox.pack_start(lbl)
-        entry = gtk.Entry()
+        hb = gtk.HBox(False, 5)
+        hb.pack_start(gtk.Label('URL:'), expand=False)
+        entry = hildon.Entry(0)
         entry.set_text("http://")
-        entry.select_region(0,-1)
-        entry.show()
-        dlg.vbox.pack_start(entry, False)
+        entry.select_region(-1, -1)
+        hb.pack_start(entry, expand=True)
+        hb.show_all()
+        dlg.vbox.pack_start(hb, False)
 
         resp = dlg.run()
         url = entry.get_text()

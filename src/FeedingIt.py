@@ -231,15 +231,19 @@ class DownloadBar(gtk.ProgressBar):
             (use_proxy, proxy) = self.config.getProxy()
             if use_proxy:
                 opener = build_opener(proxy)
-                opener.addheaders = [('User-agent', USER_AGENT)]
-                install_opener(opener)
             else:
                 opener = build_opener()
-                opener.addheaders = [('User-agent', USER_AGENT)]
-                install_opener(opener)
+
+            opener.addheaders = [('User-agent', USER_AGENT)]
+            install_opener(opener)
 
             if self.total>0:
-                self.set_text("Updating...")
+                # In preparation for i18n/l10n
+                def N_(a, b, n):
+                    return (a if n == 1 else b)
+
+                self.set_text(N_('Updating %d feed', 'Updating %d feeds', self.total) % self.total)
+
                 self.fraction = 0
                 self.set_fraction(self.fraction)
                 self.show_all()
@@ -278,38 +282,44 @@ class DownloadBar(gtk.ProgressBar):
         return True
     
     
-class SortList(gtk.Dialog):
-    def __init__(self, parent, listing):
-        gtk.Dialog.__init__(self, "Organizer",  parent)
+class SortList(hildon.StackableWindow):
+    def __init__(self, parent, listing, feedingit, after_closing):
+        hildon.StackableWindow.__init__(self)
+        self.set_transient_for(parent)
+        self.set_title('Subscriptions')
         self.listing = listing
-        
-        self.vbox2 = gtk.VBox(False, 10)
-        
+        self.feedingit = feedingit
+        self.after_closing = after_closing
+        self.connect('destroy', lambda w: self.after_closing())
+        self.vbox2 = gtk.VBox(False, 2)
+
         button = hildon.GtkButton(gtk.HILDON_SIZE_FINGER_HEIGHT)
-        button.set_label("Move Up")
+        button.set_image(gtk.image_new_from_icon_name('keyboard_move_up', gtk.ICON_SIZE_BUTTON))
         button.connect("clicked", self.buttonUp)
-        self.vbox2.pack_start(button, expand=False, fill=False)
-        
-        button = hildon.GtkButton(gtk.HILDON_SIZE_FINGER_HEIGHT)
-        button.set_label("Move Down")
-        button.connect("clicked", self.buttonDown)
         self.vbox2.pack_start(button, expand=False, fill=False)
 
         button = hildon.GtkButton(gtk.HILDON_SIZE_FINGER_HEIGHT)
-        button.set_label("Add Feed")
+        button.set_image(gtk.image_new_from_icon_name('keyboard_move_down', gtk.ICON_SIZE_BUTTON))
+        button.connect("clicked", self.buttonDown)
+        self.vbox2.pack_start(button, expand=False, fill=False)
+
+        self.vbox2.pack_start(gtk.Label(), expand=True, fill=False)
+
+        button = hildon.GtkButton(gtk.HILDON_SIZE_FINGER_HEIGHT)
+        button.set_image(gtk.image_new_from_icon_name('general_add', gtk.ICON_SIZE_BUTTON))
         button.connect("clicked", self.buttonAdd)
         self.vbox2.pack_start(button, expand=False, fill=False)
 
         button = hildon.GtkButton(gtk.HILDON_SIZE_FINGER_HEIGHT)
-        button.set_label("Edit Feed")
+        button.set_image(gtk.image_new_from_icon_name('general_information', gtk.ICON_SIZE_BUTTON))
         button.connect("clicked", self.buttonEdit)
         self.vbox2.pack_start(button, expand=False, fill=False)
-        
+
         button = hildon.GtkButton(gtk.HILDON_SIZE_FINGER_HEIGHT)
-        button.set_label("Delete")
+        button.set_image(gtk.image_new_from_icon_name('general_delete', gtk.ICON_SIZE_BUTTON))
         button.connect("clicked", self.buttonDelete)
         self.vbox2.pack_start(button, expand=False, fill=False)
-        
+
         #button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
         #button.set_label("Done")
         #button.connect("clicked", self.buttonDone)
@@ -322,7 +332,20 @@ class SortList(gtk.Dialog):
         self.displayFeeds()
         self.hbox2.pack_end(self.vbox2, expand=False)
         self.set_default_size(-1, 600)
-        self.vbox.pack_start(self.hbox2)
+        self.add(self.hbox2)
+
+        menu = hildon.AppMenu()
+        button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
+        button.set_label("Import from OPML")
+        button.connect("clicked", self.feedingit.button_import_clicked)
+        menu.append(button)
+
+        button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
+        button.set_label("Export to OPML")
+        button.connect("clicked", self.feedingit.button_export_clicked)
+        menu.append(button)
+        self.set_app_menu(menu)
+        menu.show_all()
         
         self.show_all()
         #self.connect("destroy", self.buttonDone)
@@ -474,22 +497,22 @@ class DisplayArticle(hildon.StackableWindow):
         menu = hildon.AppMenu()
         # Create a button and add it to the menu
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
-        button.set_label("Allow Horizontal Scrolling")
+        button.set_label("Allow horizontal scrolling")
         button.connect("clicked", self.horiz_scrolling_button)
         menu.append(button)
         
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
-        button.set_label("Open in Browser")
+        button.set_label("Open in browser")
         button.connect("clicked", self._signal_link_clicked, self.feed.getExternalLink(self.id))
         menu.append(button)
         
         if key == "ArchivedArticles":
             button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
-            button.set_label("Remove from Archived Articles")
+            button.set_label("Remove from archived articles")
             button.connect("clicked", self.remove_archive_button)
         else:
             button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
-            button.set_label("Add to Archived Articles")
+            button.set_label("Add to archived articles")
             button.connect("clicked", self.archive_button)
         menu.append(button)
         
@@ -605,18 +628,18 @@ class DisplayFeed(hildon.StackableWindow):
         
         menu = hildon.AppMenu()
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
-        button.set_label("Update Feed")
+        button.set_label("Update feed")
         button.connect("clicked", self.button_update_clicked)
         menu.append(button)
         
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
-        button.set_label("Mark All As Read")
+        button.set_label("Mark all as read")
         button.connect("clicked", self.buttonReadAllClicked)
         menu.append(button)
         
         if key=="ArchivedArticles":
             button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
-            button.set_label("Purge Read Articles")
+            button.set_label("Delete read articles")
             button.connect("clicked", self.buttonPurgeArticles)
             menu.append(button)
         
@@ -888,35 +911,25 @@ class FeedingIt:
         menu = hildon.AppMenu()
         # Create a button and add it to the menu
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
-        button.set_label("Update All Feeds")
+        button.set_label("Update feeds")
         button.connect("clicked", self.button_update_clicked, "All")
         menu.append(button)
         
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
-        button.set_label("Mark All As Read")
+        button.set_label("Mark all as read")
         button.connect("clicked", self.button_markAll)
         menu.append(button)
         
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
-        button.set_label("Organize Feeds")
+        button.set_label("Manage subscriptions")
         button.connect("clicked", self.button_organize_clicked)
         menu.append(button)
 
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
-        button.set_label("Preferences")
+        button.set_label("Settings")
         button.connect("clicked", self.button_preferences_clicked)
         menu.append(button)
        
-        button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
-        button.set_label("Import Feeds")
-        button.connect("clicked", self.button_import_clicked)
-        menu.append(button)
-        
-        button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
-        button.set_label("Export Feeds")
-        button.connect("clicked", self.button_export_clicked)
-        menu.append(button)
-
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
         button.set_label("About")
         button.connect("clicked", self.button_about_clicked)
@@ -998,12 +1011,11 @@ class FeedingIt:
         self.displayListing()
 
     def button_organize_clicked(self, button):
-        org = SortList(self.window, self.listing)
-        org.run()
-        org.destroy()
-        self.listing.saveConfig()
-        self.displayListing()
-        
+        def after_closing():
+            self.listing.saveConfig()
+            self.displayListing()
+        SortList(self.window, self.listing, self, after_closing)
+
     def button_update_clicked(self, button, key):
         if not type(self.downloadDialog).__name__=="DownloadBar":
             self.updateDbusHandler.UpdateStarted()
