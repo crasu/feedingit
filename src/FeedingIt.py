@@ -83,7 +83,8 @@ FEED_COLUMN_MARKUP, FEED_COLUMN_KEY = range(2)
 import style
 
 MARKUP_TEMPLATE= '<span font_desc="%s" foreground="%s">%%s</span>'
-MARKUP_TEMPLATE_ENTRY = '<span font_desc="%s %%s" foreground="%s">%%s</span>'
+MARKUP_TEMPLATE_ENTRY_UNREAD = '<span font_desc="%s %%s" foreground="%s">%%s</span>'
+MARKUP_TEMPLATE_ENTRY = '<span font_desc="%s italic %%s" foreground="%s">%%s</span>'
 
 # Build the markup template for the Maemo 5 text style
 head_font = style.get_font_desc('SystemFont')
@@ -102,8 +103,8 @@ entry_normal_sub = MARKUP_TEMPLATE_ENTRY % (sub_font.get_family(), sub_color.to_
 active_head = MARKUP_TEMPLATE % (head_font.to_string(), active_color.to_string())
 active_sub = MARKUP_TEMPLATE % (sub_font.to_string(), active_color.to_string())
 
-entry_active_head = MARKUP_TEMPLATE_ENTRY % (head_font.get_family(), active_color.to_string())
-entry_active_sub = MARKUP_TEMPLATE_ENTRY % (sub_font.get_family(), active_color.to_string())
+entry_active_head = MARKUP_TEMPLATE_ENTRY_UNREAD % (head_font.get_family(), active_color.to_string())
+entry_active_sub = MARKUP_TEMPLATE_ENTRY_UNREAD % (sub_font.get_family(), active_color.to_string())
 
 FEED_TEMPLATE = '\n'.join((head, normal_sub))
 FEED_TEMPLATE_UNREAD = '\n'.join((head, active_sub))
@@ -706,6 +707,7 @@ class DisplayFeed(hildon.StackableWindow):
 
         self.markup_renderer = gtk.CellRendererText()
         self.markup_renderer.set_property('wrap-mode', pango.WRAP_WORD_CHAR)
+        self.markup_renderer.set_property('background', "#333333")
         (width, height) = self.get_size()
         self.markup_renderer.set_property('wrap-width', width-20)
         self.markup_renderer.set_property('ypad', 5)
