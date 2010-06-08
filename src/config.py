@@ -55,6 +55,8 @@ class Config():
     def createDialog(self):
         
         self.window = gtk.Dialog("Settings", self.parent)
+        self.window.set_geometry_hints(min_height=600)
+
         save_button = self.window.add_button(gtk.STOCK_SAVE, gtk.RESPONSE_OK)
         save_button.connect('clicked', self.on_save_button_clicked)
         #self.window.set_default_size(-1, 600)
@@ -117,7 +119,7 @@ class Config():
         button.set_label('Cache images')
         button.set_active(self.config["imageCache"])
         button.connect("toggled", self.button_toggled, "imageCache")
-        vbox.pack_start(button, expand=False)      
+        vbox.pack_start(button, expand=False)
 
         button = hildon.CheckButton(gtk.HILDON_SIZE_FINGER_HEIGHT)
         button.set_label("Use HTTP proxy")
@@ -127,7 +129,7 @@ class Config():
         
         panArea.add_with_viewport(vbox)
         
-        self.window.vbox.add(panArea)        
+        self.window.vbox.add(panArea)
         self.window.connect("destroy", self.onExit)
         #self.window.add(self.vbox)
         self.window.set_default_size(-1, 600)
