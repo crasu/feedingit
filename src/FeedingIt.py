@@ -658,6 +658,11 @@ class DisplayFeed(hildon.StackableWindow):
         # Fix up the column width for wrapping the text when the window is
         # resized (i.e. orientation changed)
         self.markup_renderer.set_property('wrap-width', event.width-20)  
+        it = self.feedItems.get_iter_first()
+        while it is not None:
+            markup = self.feedItems.get_value(it, FEED_COLUMN_MARKUP)
+            self.feedItems.set_value(it, FEED_COLUMN_MARKUP, markup)
+            it = self.feedItems.iter_next(it)
 
     def destroyWindow(self, *args):
         #self.feed.saveUnread(CONFIGDIR)
