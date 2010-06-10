@@ -412,21 +412,36 @@ class SortList(hildon.StackableWindow):
 
     def buttonDelete(self, button):
         key = self.getSelectedItem()
-        if not key == None:
-            self.listing.removeFeed(key)
-        self.refreshList()
+
+        if key == 'ArchivedArticles':
+            message = 'Cannot remove the archived articles feed.'
+            hildon.hildon_banner_show_information(self, '', message)
+        elif key is not None:
+            message = 'Really remove this feed and its entries?'
+            dlg = hildon.hildon_note_new_confirmation(self, message)
+            response = dlg.run()
+            dlg.destroy()
+            if response == gtk.RESPONSE_OK:
+                self.listing.removeFeed(key)
+                self.refreshList()
 
     def buttonEdit(self, button):
         key = self.getSelectedItem()
-        if not key == None:
+
+        if key == 'ArchivedArticles':
+            message = 'Cannot edit the archived articles feed.'
+            hildon.hildon_banner_show_information(self, '', message)
+            return
+
+        if key is not None:
             wizard = AddWidgetWizard(self, self.listing.getFeedUrl(key), self.listing.getFeedTitle(key))
             ret = wizard.run()
             if ret == 2:
                 (title, url) = wizard.getData()
                 if (not title == '') and (not url == ''):
                     self.listing.editFeed(key, title, url)
+                    self.refreshList()
             wizard.destroy()
-        self.refreshList()
 
     def buttonDone(self, *args):
         self.destroy()
