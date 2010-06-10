@@ -313,7 +313,9 @@ class Feed:
             self.readItems[id] = False
     
     def isEntryRead(self, id):
-        return self.readItems[id]
+        # Check if an entry is read; return False if the read
+        # status of an entry is unknown (id not in readItems)
+        return self.readItems.get(id, False)
     
     def getTitle(self, id):
         return self.entries[id]["title"]
