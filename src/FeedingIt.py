@@ -941,7 +941,12 @@ class FeedingIt:
         button.set_label("Mark all as read")
         button.connect("clicked", self.button_markAll)
         menu.append(button)
-        
+
+        button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
+        button.set_label("Add new feed")
+        button.connect("clicked", lambda b: self.addFeed())
+        menu.append(button)
+
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
         button.set_label("Manage subscriptions")
         button.connect("clicked", self.button_organize_clicked)
