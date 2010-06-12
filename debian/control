@@ -12,48 +12,98 @@ Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, python, python-hildon,
  python-dbus, python-osso, python-gconf, python2.5-webkit,
  python-hildondesktop, hildon-desktop-python-loader
-Description:
- RSS Reader
- Its main features are portrait mode support, auto-update, swipe left or right while
- in articles to move to the previous or next article, import/export of OPML files,
- image caching, desktop widget
-XB-Maemo-Icon-26:
- iVBORw0KGgoAAAANSUhEUgAAABoAAAAaCAYAAACpSkzOAAAAAXNSR0IArs4c                                                                                                                                     
- 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
- WUsq//fg/wAnQYd0SCjJNQAAAABJRU5ErkJggg
+Description: A RSS feed reader with portrait mode support
+ FeedingIt is an easy to use RSS feed reader with portrait
+ mode support and automatic feed updates. You can swipe left
+ and right to move between articles. Import and export of
+ subscription lists is supported for OPML files. Images can
+ be cached during the feed update, so you can view images in
+ the downloaded articles while offline.
+ .
+ A desktop widget is provided for updating feeds and quick
+ access to your favourite feeds.
+XB-Maemo-Icon-26: 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
+ AI/3VErEZu5CAAAAAElFTkSuQmCC
+ ====
+
