@@ -140,53 +140,52 @@ def unescape(text):
     return sub("&#?\w+;", fixup, text)
 
 
-class AddWidgetWizard(hildon.WizardDialog):
-    
-    def __init__(self, parent, urlIn, titleIn=None):
-        # Create a Notebook
-        self.notebook = gtk.Notebook()
+class AddWidgetWizard(gtk.Dialog):
+    def __init__(self, parent, urlIn, titleIn=None, isEdit=False):
+        gtk.Dialog.__init__(self)
+        self.set_transient_for(parent)
+
+        if isEdit:
+            self.set_title('Edit RSS feed')
+        else:
+            self.set_title('Add new RSS feed')
+
+        if isEdit:
+            self.btn_add = self.add_button('Save', 2)
+        else:
+            self.btn_add = self.add_button('Add', 2)
+
+        self.set_default_response(2)
 
         self.nameEntry = hildon.Entry(gtk.HILDON_SIZE_AUTO)
-        self.nameEntry.set_placeholder("Enter Feed Name")
-        vbox = gtk.VBox(False,10)
-        label = gtk.Label("Enter Feed Name:")
-        vbox.pack_start(label)
-        vbox.pack_start(self.nameEntry)
+        self.nameEntry.set_placeholder('Feed name')
         if not titleIn == None:
             self.nameEntry.set_text(titleIn)
-        self.notebook.append_page(vbox, None)
-        
+            self.nameEntry.select_region(-1, -1)
+
         self.urlEntry = hildon.Entry(gtk.HILDON_SIZE_AUTO)
-        self.urlEntry.set_placeholder("Enter a URL")
+        self.urlEntry.set_placeholder('Feed URL')
         self.urlEntry.set_text(urlIn)
-        self.urlEntry.select_region(0,-1)
-        
-        vbox = gtk.VBox(False,10)
-        label = gtk.Label("Enter Feed URL:")
-        vbox.pack_start(label)
-        vbox.pack_start(self.urlEntry)
-        self.notebook.append_page(vbox, None)
+        self.urlEntry.select_region(-1, -1)
+        self.urlEntry.set_activates_default(True)
 
-        labelEnd = gtk.Label("Success")
-        
-        self.notebook.append_page(labelEnd, None)      
+        self.table = gtk.Table(2, 2, False)
+        self.table.set_col_spacings(5)
+        label = gtk.Label('Name:')
+        label.set_alignment(1., .5)
+        self.table.attach(label, 0, 1, 0, 1, gtk.FILL)
+        self.table.attach(self.nameEntry, 1, 2, 0, 1)
+        label = gtk.Label('URL:')
+        label.set_alignment(1., .5)
+        self.table.attach(label, 0, 1, 1, 2, gtk.FILL)
+        self.table.attach(self.urlEntry, 1, 2, 1, 2)
+        self.vbox.pack_start(self.table)
 
-        hildon.WizardDialog.__init__(self, parent, "Add Feed", self.notebook)
-   
-        # Set a handler for "switch-page" signal
-        #self.notebook.connect("switch_page", self.on_page_switch, self)
-   
-        # Set a function to decide if user can go to next page
-        self.set_forward_page_func(self.some_page_func)
-   
         self.show_all()
-        
+
     def getData(self):
         return (self.nameEntry.get_text(), self.urlEntry.get_text())
-        
-    def on_page_switch(self, notebook, page, num, dialog):
-        return True
-   
+
     def some_page_func(self, nb, current, userdata):
         # Validate data for 1st page
         if current == 0:
@@ -434,7 +433,7 @@ class SortList(hildon.StackableWindow):
             return
 
         if key is not None:
-            wizard = AddWidgetWizard(self, self.listing.getFeedUrl(key), self.listing.getFeedTitle(key))
+            wizard = AddWidgetWizard(self, self.listing.getFeedUrl(key), self.listing.getFeedTitle(key), True)
             ret = wizard.run()
             if ret == 2:
                 (title, url) = wizard.getData()
