@@ -3,8 +3,9 @@ feedingit (0.7.0-3) unstable; urgency=low
   * Fixed re-layout of article listing when switching portrait to/from landscape
   * Fixed landscape rotation bug for PR1.2 (by Thp)
   * Better UI and interaction for menus, the settings dialog and subscriptions menu (Thp)
+  * Added grey background colour to article listing
 
- -- Yves <yves@marcoz.org>  Mon, 07 May 2010 22:41:19 -0800
+ -- Yves <yves@marcoz.org>  Tue, 08 Jun 2010 07:34:19 -0800
 
 feedingit (0.7.0-2) unstable; urgency=low
 

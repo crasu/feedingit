@@ -412,17 +412,13 @@ class SortList(hildon.StackableWindow):
     def buttonDelete(self, button):
         key = self.getSelectedItem()
 
-        if key == 'ArchivedArticles':
-            message = 'Cannot remove the archived articles feed.'
-            hildon.hildon_banner_show_information(self, '', message)
-        elif key is not None:
-            message = 'Really remove this feed and its entries?'
-            dlg = hildon.hildon_note_new_confirmation(self, message)
-            response = dlg.run()
-            dlg.destroy()
-            if response == gtk.RESPONSE_OK:
-                self.listing.removeFeed(key)
-                self.refreshList()
+        message = 'Really remove this feed and its entries?'
+        dlg = hildon.hildon_note_new_confirmation(self, message)
+        response = dlg.run()
+        dlg.destroy()
+        if response == gtk.RESPONSE_OK:
+            self.listing.removeFeed(key)
+            self.refreshList()
 
     def buttonEdit(self, button):
         key = self.getSelectedItem()
