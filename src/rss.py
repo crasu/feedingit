@@ -132,17 +132,20 @@ class Feed:
             tmp=feedparser.parse(self.url, etag = self.etag, modified = self.modified)
         else:
             tmp=feedparser.parse(self.url, etag = self.etag, modified = self.modified, handlers = [proxy])
-        try:
-            self.etag = tmp["etag"]
-        except KeyError:
-            pass
-        try:
-            self.modified = tmp["modified"]
-        except KeyError:
-            pass
         expiry = float(expiryTime) * 3600.
+
         # Check if the parse was succesful (number of entries > 0, else do nothing)
         if len(tmp["entries"])>0:
+           # The etag and modified value should only be updated if the content was not null
+           try:
+               self.etag = tmp["etag"]
+           except KeyError:
+               self.etag = None
+           try:
+               self.modified = tmp["modified"]
+           except KeyError:
+               self.modified = None
+           #if len(tmp["entries"])>0:
            if not isdir(configdir+self.uniqueId+".d"):
                mkdir(configdir+self.uniqueId+".d")
            try:
