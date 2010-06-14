@@ -484,26 +484,18 @@ class DisplayArticle(hildon.StackableWindow):
         contentLink = self.feed.getContentLink(self.id)
         self.feed.setEntryRead(self.id)
         #if key=="ArchivedArticles":
+        self.loadedArticle = False
         if contentLink.startswith("/home/user/"):
-            self.view.open("file://" + contentLink)
+            self.view.open("file://%s" % contentLink)
+            self.currentUrl = self.feed.getExternalLink(self.id)
         else:
             self.view.load_html_string('This article has not been downloaded yet. Click <a href="%s">here</a> to view online.' % contentLink, contentLink)
+            self.currentUrl = "%s" % contentLink
         self.view.connect("motion-notify-event", lambda w,ev: True)
         self.view.connect('load-started', self.load_started)
         self.view.connect('load-finished', self.load_finished)
 
-        #else:
-        #self.view.load_html_string(self.text, contentLink) # "text/html", "utf-8", self.link)
         self.view.set_zoom_level(float(config.getArtFontSize())/10.)
-        #else:
-        #    if not key == "ArchivedArticles":
-                # Do not download images if the feed is "Archived Articles"
-        #        self.document.connect("request-url", self._signal_request_url)
-            
-        #    self.document.clear()
-        #    self.document.open_stream("text/html")
-        #    self.document.write_stream(self.text)
-        #    self.document.close_stream()
         
         menu = hildon.AppMenu()
         # Create a button and add it to the menu
@@ -514,7 +506,7 @@ class DisplayArticle(hildon.StackableWindow):
         
         button = hildon.GtkButton(gtk.HILDON_SIZE_AUTO)
         button.set_label("Open in browser")
-        button.connect("clicked", self._signal_link_clicked, self.feed.getExternalLink(self.id))
+        button.connect("clicked", self.open_in_browser)
         menu.append(button)
         
         if key == "ArchivedArticles":
@@ -530,24 +522,37 @@ class DisplayArticle(hildon.StackableWindow):
         self.set_app_menu(menu)
         menu.show_all()
         
-        #self.event_box = gtk.EventBox()
-        #self.event_box.add(self.pannable_article)
         self.add(self.pannable_article)
-        
         
         self.pannable_article.show_all()
 
         self.destroyId = self.connect("destroy", self.destroyWindow)
         
+        #self.view.connect('navigation-policy-decision-requested', self.navigation_policy_decision)
+        ## Still using an old version of WebKit, so using navigation-requested signal
+        self.view.connect('navigation-requested', self.navigation_requested)
+        
         self.view.connect("button_press_event", self.button_pressed)
         self.gestureId = self.view.connect("button_release_event", self.button_released)
-        #self.timeout_handler_id = gobject.timeout_add(300, self.reloadArticle)
+
+    #def navigation_policy_decision(self, wv, fr, req, action, decision):
+    def navigation_requested(self, wv, fr, req):
+        if self.config.getOpenInExternalBrowser():
+            self.open_in_browser(None, req.get_uri())
+            return True
+        else:
+            return False
 
     def load_started(self, *widget):
         hildon.hildon_gtk_window_set_progress_indicator(self, 1)
         
     def load_finished(self, *widget):
         hildon.hildon_gtk_window_set_progress_indicator(self, 0)
+        frame = self.view.get_main_frame()
+        if self.loadedArticle:
+            self.currentUrl = frame.get_uri()
+        else:
+            self.loadedArticle = True
 
     def button_pressed(self, window, event):
         #print event.x, event.y
@@ -562,16 +567,6 @@ class DisplayArticle(hildon.StackableWindow):
                 self.emit("article-previous", self.id)
             elif (x<-15):
                 self.emit("article-next", self.id)   
-        #print x, y
-        #print "Released"
-
-    #def gesture(self, widget, direction, startx, starty):
-    #    if (direction == 3):
-    #        self.emit("article-next", self.index)
-    #    if (direction == 2):
-    #        self.emit("article-previous", self.index)
-        #print startx, starty
-        #self.timeout_handler_id = gobject.timeout_add(200, self.destroyWindow)
 
     def destroyWindow(self, *args):
         self.disconnect(self.destroyId)
@@ -592,33 +587,16 @@ class DisplayArticle(hildon.StackableWindow):
         
     def remove_archive_button(self, *widget):
         self.set_for_removal = True
-        
-    #def reloadArticle(self, *widget):
-    #    if threading.activeCount() > 1:
-            # Image thread are still running, come back in a bit
-    #        return True
-    #    else:
-    #        for (stream, imageThread) in self.images:
-    #            imageThread.join()
-    #            stream.write(imageThread.data)
-    #            stream.close()
-    #        return False
-    #    self.show_all()
 
-    def _signal_link_clicked(self, object, link):
+    def open_in_browser(self, object, link=None):
         import dbus
         bus = dbus.SessionBus()
         proxy = bus.get_object("com.nokia.osso_browser", "/com/nokia/osso_browser/request")
         iface = dbus.Interface(proxy, 'com.nokia.osso_browser')
-        iface.open_new_window(link)
-
-    #def _signal_request_url(self, object, url, stream):
-        #print url
-    #    self.imageDownloader.queueImage(url, stream)
-        #imageThread = GetImage(url)
-        #imageThread.start()
-        #self.images.append((stream, imageThread))
-
+        if link == None:
+            iface.open_new_window(self.currentUrl)
+        else:
+            iface.open_new_window(link)
 
 class DisplayFeed(hildon.StackableWindow):
     def __init__(self, listing, feed, title, key, config, updateDbusHandler):

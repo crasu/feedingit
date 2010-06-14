@@ -127,6 +127,12 @@ class Config():
         button.connect("toggled", self.button_toggled, "proxy")
         vbox.pack_start(button, expand=False)
         
+        button = hildon.CheckButton(gtk.HILDON_SIZE_FINGER_HEIGHT)
+        button.set_label('Open links in external browser')
+        button.set_active(self.config["extBrowser"])
+        button.connect("toggled", self.button_toggled, "extBrowser")
+        vbox.pack_start(button, expand=False)
+        
         panArea.add_with_viewport(vbox)
         
         self.window.vbox.add(panArea)
@@ -202,6 +208,10 @@ class Config():
         except:
             self.config["hidereadfeeds"] = False
             self.config["hidereadarticles"] = False
+        try:
+            self.config["extBrowser"] = configParser.getboolean(section, "extBrowser")
+        except:
+            self.config["extBrowser"] = False
         
     def saveConfig(self):
         configParser = RawConfigParser()
@@ -216,6 +226,7 @@ class Config():
         configParser.set(section, 'proxy', str(self.config["proxy"]))
         configParser.set(section, 'hidereadfeeds', str(self.config["hidereadfeeds"]))
         configParser.set(section, 'hidereadarticles', str(self.config["hidereadarticles"]))
+        configParser.set(section, 'extBrowser', str(self.config["extBrowser"]))
 
         # Writing our configuration file
         file = open(self.configFilename, 'wb')
@@ -267,3 +278,5 @@ class Config():
         return self.config["hidereadfeeds"]
     def getHideReadArticles(self):
         return self.config["hidereadarticles"]
+    def getOpenInExternalBrowser(self):
+        return self.config["extBrowser"]
