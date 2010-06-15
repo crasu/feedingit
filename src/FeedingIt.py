@@ -55,6 +55,8 @@ timeout = 5
 setdefaulttimeout(timeout)
 del timeout
 
+import xml.sax
+
 LIST_ICON_SIZE = 32
 LIST_ICON_BORDER = 10
 
@@ -1053,27 +1055,48 @@ class FeedingIt:
                 gtk.ICON_LOOKUP_USE_BUILTIN)
 
         self.feedItems.clear()
+        feedInfo = {}
+        count = 0
         for key in self.listing.getListOfFeeds():
             unreadItems = self.listing.getFeedNumberOfUnreadItems(key)
             if unreadItems > 0 or not self.config.getHideReadFeeds():
+                count=count+1
                 title = self.listing.getFeedTitle(key)
                 updateTime = self.listing.getFeedUpdateTime(key)
-                
+                updateStamp = self.listing.getFeedUpdateStamp(key)
                 subtitle = '%s / %d unread items' % (updateTime, unreadItems)
+                feedInfo[key] = [count, unreadItems, updateStamp, title, subtitle, updateTime];
+
+        order = self.config.getFeedSortOrder();
+        if   order == "Most unread":
+            keyorder = sorted(feedInfo, key = lambda k: feedInfo[k][1], reverse=True)
+        elif order == "Least unread":
+            keyorder = sorted(feedInfo, key = lambda k: feedInfo[k][1])
+        elif order == "Most recent":
+            keyorder = sorted(feedInfo, key = lambda k: feedInfo[k][2], reverse=True)
+        elif order == "Least recent":
+            keyorder = sorted(feedInfo, key = lambda k: feedInfo[k][2])
+        else: # order == "Manual" or invalid value...
+            keyorder = sorted(feedInfo, key = lambda k: feedInfo[k][0])
+        
+        for key in keyorder:
+            unreadItems = feedInfo[key][1]
+            title = xml.sax.saxutils.escape(feedInfo[key][3])
+            subtitle = feedInfo[key][4]
+            updateTime = feedInfo[key][5]
+            if unreadItems:
+                markup = FEED_TEMPLATE_UNREAD % (title, subtitle)
+            else:
+                markup = FEED_TEMPLATE % (title, subtitle)
     
-                if unreadItems:
-                    markup = FEED_TEMPLATE_UNREAD % (title, subtitle)
-                else:
-                    markup = FEED_TEMPLATE % (title, subtitle)
+            try:
+                icon_filename = self.listing.getFavicon(key)
+                pixbuf = gtk.gdk.pixbuf_new_from_file_at_size(icon_filename, \
+                                               LIST_ICON_SIZE, LIST_ICON_SIZE)
+            except:
+                pixbuf = default_pixbuf
     
-                try:
-                    icon_filename = self.listing.getFavicon(key)
-                    pixbuf = gtk.gdk.pixbuf_new_from_file_at_size(icon_filename, \
-                            LIST_ICON_SIZE, LIST_ICON_SIZE)
-                except:
-                    pixbuf = default_pixbuf
-    
-                self.feedItems.append((pixbuf, markup, key))
+            self.feedItems.append((pixbuf, markup, key))
 
     def on_feedList_row_activated(self, treeview, path, column):
         model = treeview.get_model()
