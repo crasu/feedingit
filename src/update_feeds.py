@@ -109,7 +109,7 @@ class FeedUpdate():
         try:
             self.updateThread.running = False
         except:
-            pass
+            mainloop.quit()
 
 import dbus.mainloop.glib
 dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)

@@ -894,9 +894,21 @@ class FeedingIt:
     def createWindow(self):
         self.app_lock = get_lock("app_lock")
         if self.app_lock == None:
+            try:
+                self.stopButton.set_sensitive(True)
+            except:
+                self.stopButton = hildon.Button(gtk.HILDON_SIZE_AUTO_WIDTH | gtk.HILDON_SIZE_FINGER_HEIGHT, hildon.BUTTON_ARRANGEMENT_VERTICAL)
+                self.stopButton.set_text("Stop update","")
+                self.stopButton.connect("clicked", self.stop_running_update)
+                self.mainVbox.pack_end(self.stopButton, expand=False, fill=False)
+                self.window.show_all()
             self.introLabel.set_label("Update in progress, please wait.")
             gobject.timeout_add_seconds(3, self.createWindow)
             return False
+        try:
+            self.stopButton.destroy()
+        except:
+            pass
         self.listing = Listing(CONFIGDIR)
         
         self.downloadDialog = False
@@ -969,6 +981,16 @@ class FeedingIt:
         hildon.hildon_gtk_window_set_progress_indicator(self.window, 0)
         gobject.idle_add(self.enableDbus)
         
+    def stop_running_update(self, button):
+        self.stopButton.set_sensitive(False)
+        import dbus
+        bus=dbus.SessionBus()
+        remote_object = bus.get_object("org.marcoz.feedingit", # Connection name
+                               "/org/marcoz/feedingit/update" # Object's path
+                              )
+        iface = dbus.Interface(remote_object, 'org.marcoz.feedingit')
+        iface.StopUpdate()
+    
     def enableDbus(self):
         self.dbusHandler = ServerObject(self)
         self.updateDbusHandler = UpdateServerObject(self)
