@@ -70,6 +70,7 @@ class Feed:
         self.url = url
         self.countUnread = 0
         self.updateTime = "Never"
+        self.updateStamp = 0
         self.uniqueId = uniqueId
         self.etag = None
         self.modified = None
@@ -254,6 +255,7 @@ class Feed:
            del tmp
            self.countUnread = tmpUnread
            self.updateTime = time.asctime()
+           self.updateStamp = currentTime
            self.saveFeed(configdir)
            from glob import glob
            from os import stat
@@ -346,6 +348,13 @@ class Feed:
     def getUpdateTime(self):
         return self.updateTime
     
+    def getUpdateStamp(self):
+        try:
+            return self.updateStamp
+        except:
+            self.updateStamp = 0
+            return self.updateStamp
+
     def getEntries(self):
         return self.entries
     
@@ -480,6 +489,7 @@ class ArchivedArticles(Feed):
             #        if currentTime - entry["time"] > 2*expiry:
             #            self.removeEntry(id)
         self.updateTime = time.asctime()
+        self.updateStamp = time.time()
         self.saveFeed(configdir)
         
     def purgeReadArticles(self):
@@ -573,12 +583,14 @@ class Listing:
             feed.updateFeed(self.configdir, expiryTime, proxy, imageCache)
             self.listOfFeeds[key]["unread"] = feed.getNumberOfUnreadItems()
             self.listOfFeeds[key]["updateTime"] = feed.getUpdateTime()
+            self.listOfFeeds[key]["updateStamp"] = feed.getUpdateStamp()
             
     def updateFeed(self, key, expiryTime=24, proxy=None, imageCache=False):
         feed = self.getFeed(key)
         feed.updateFeed(self.configdir, expiryTime, proxy, imageCache)
         self.listOfFeeds[key]["unread"] = feed.getNumberOfUnreadItems()
         self.listOfFeeds[key]["updateTime"] = feed.getUpdateTime()
+        self.listOfFeeds[key]["updateStamp"] = feed.getUpdateStamp()
         
     def editFeed(self, key, title, url):
         self.listOfFeeds[key]["title"] = title
@@ -612,6 +624,12 @@ class Listing:
             self.listOfFeeds[key]["updateTime"] = "Never"
         return self.listOfFeeds[key]["updateTime"]
     
+    def getFeedUpdateStamp(self, key):
+        #print self.listOfFeeds.has_key(key)
+        if not self.listOfFeeds[key].has_key("updateStamp"):
+            self.listOfFeeds[key]["updateStamp"] = 0
+        return self.listOfFeeds[key]["updateStamp"]
+
     def getFeedNumberOfUnreadItems(self, key):
         if not self.listOfFeeds[key].has_key("unread"):
             self.listOfFeeds[key]["unread"] = 0
