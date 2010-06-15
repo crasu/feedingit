@@ -1087,11 +1087,12 @@ class FeedingIt:
             self.feed_lock
         except:
             # If feed_lock doesn't exist, we can open the feed, else we do nothing
-            self.feed_lock = get_lock(key)
-            self.disp = DisplayFeed(self.listing, self.listing.getFeed(key), \
-                    self.listing.getFeedTitle(key), key, \
-                    self.config, self.updateDbusHandler)
-            self.disp.connect("feed-closed", self.onFeedClosed)
+            if key != None:
+                self.feed_lock = get_lock(key)
+                self.disp = DisplayFeed(self.listing, self.listing.getFeed(key), \
+                        self.listing.getFeedTitle(key), key, \
+                        self.config, self.updateDbusHandler)
+                self.disp.connect("feed-closed", self.onFeedClosed)
         
 
     def onFeedClosed(self, object, key):

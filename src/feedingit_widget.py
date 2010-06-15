@@ -113,7 +113,7 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
         unread_renderer.set_property("font-desc", font_desc)        
         self.treeview.append_column(gtk.TreeViewColumn('Feed Name', name_renderer, text = 0))
         self.treeview.append_column(gtk.TreeViewColumn('Unread Items', unread_renderer, text = 1))
-        selection = self.treeview.get_selection()
+        #selection = self.treeview.get_selection()
         #selection.set_mode(gtk.SELECTION_NONE)
         #self.treeview.get_selection().set_mode(gtk.SELECTION_NONE)
         #hildon.hildon_gtk_tree_view_set_ui_mode(self.treeview, gtk.HILDON_UI_MODE_NORMAL)
@@ -128,7 +128,7 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
         #gobject.timeout_add_seconds(30*60, self.update_list)
       except:
           import traceback
-          file = open("/home/user/.feedingit/feedingit_widget.log", "a")
+          file = open("/home/user/feedingit_widget.log", "a")
           traceback.print_exc(file=file)
           file.close()
           
@@ -179,31 +179,37 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
         if self.feed_list == {}:
             self.load_config()
 
-        list = []
-        oldtotal = self.total
-        self.total = 0
-        #for key in listOfFeeds["feedingit-order"]:
-        for key in self.feed_list.keys():
-            try:
-                file = open(CONFIGDIR+key+".d/unread", "r")
-                readItems = pickle.load( file )
-                file.close()
-                countUnread = 0
-                for id in readItems.keys():
-                    if readItems[id]==False:
-                        countUnread = countUnread + 1
-                list.append([self.feed_list[key][0:18], countUnread, key])
-                self.total += countUnread
-            except:
-                pass
-        list = sorted(list, key=lambda item: item[1], reverse=True)
-        for item in list[0:8]:
-            treestore.append(item)
-        self.treeview.set_model(treestore)
-        if self.total > oldtotal:
-            self.update_label("%s Unread" %str(self.total), "%s more articles" %str(self.total-oldtotal))
+        if self.feed_list == None:
+            treestore.append(["Start Application", "", None])
+            self.update_label("No feeds added yet")
+            self.treeview.set_model(treestore)
+            
         else:
-            self.update_label("%s Unread" %str(self.total))
+            list = []
+            oldtotal = self.total
+            self.total = 0
+            #for key in listOfFeeds["feedingit-order"]:
+            for key in self.feed_list.keys():
+                try:
+                    file = open(CONFIGDIR+key+".d/unread", "r")
+                    readItems = pickle.load( file )
+                    file.close()
+                    countUnread = 0
+                    for id in readItems.keys():
+                        if readItems[id]==False:
+                            countUnread = countUnread + 1
+                    list.append([self.feed_list[key][0:18], countUnread, key])
+                    self.total += countUnread
+                except:
+                    pass
+            list = sorted(list, key=lambda item: item[1], reverse=True)
+            for item in list[0:8]:
+                treestore.append(item)
+            self.treeview.set_model(treestore)
+            if self.total > oldtotal:
+                self.update_label("%s Unread" %str(self.total), "%s more articles" %str(self.total-oldtotal))
+            else:
+                self.update_label("%s Unread" %str(self.total))
         return True
 
     def create_selector(self, choices, setting):
@@ -244,44 +250,52 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
             return picker
         
     def show_settings(self, widget):
-        file = open(CONFIGDIR+"feeds.pickle")
-        listOfFeeds = pickle.load(file)
-        file.close()
-        dialog = gtk.Dialog("Choose feeds to display", None, gtk.DIALOG_DESTROY_WITH_PARENT | gtk.DIALOG_NO_SEPARATOR, (gtk.STOCK_OK, gtk.RESPONSE_ACCEPT, gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL))
-
-        self.pannableArea = hildon.PannableArea()
-        
-        #self.treestore_settings = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
-        self.treeview_settings = gtk.TreeView()
-        
-        self.treeview_settings.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
-        hildon.hildon_gtk_tree_view_set_ui_mode(self.treeview_settings, gtk.HILDON_UI_MODE_EDIT)
-        dialog.vbox.pack_start(self.pannableArea)
-        
-        self.treeview_settings.append_column(gtk.TreeViewColumn('Feed Name', gtk.CellRendererText(), text = 0))
-        self.treestore_settings = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
-        self.treeview_settings.set_model(self.treestore_settings)
-        
-        for key in listOfFeeds["feedingit-order"]:
-            title = listOfFeeds[key]["title"]
-            item = self.treestore_settings.append([title, key])
-            if key in self.feed_list:
-                self.treeview_settings.get_selection().select_iter(item)
+        if isfile(CONFIGDIR+"feeds.pickle"):
+            file = open(CONFIGDIR+"feeds.pickle")
+            listOfFeeds = pickle.load(file)
+            file.close()
+            dialog = gtk.Dialog("Choose feeds to display", None, gtk.DIALOG_DESTROY_WITH_PARENT | gtk.DIALOG_NO_SEPARATOR, (gtk.STOCK_OK, gtk.RESPONSE_ACCEPT, gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL))
+    
+            self.pannableArea = hildon.PannableArea()
             
-        self.pannableArea.add(self.treeview_settings)
-        self.pannableArea.show_all()
-        dialog.set_default_size(-1, 600)
-        
-        dialog.action_area.pack_start(self.create_autoupdate_picker())
-        
-        dialog.show_all()
-        response = dialog.run()
-
-        if response == gtk.RESPONSE_ACCEPT:
-            self.feed_list = self.getItems()
-        dialog.destroy()
-        self.save_config()
-        self.update_list()
+            #self.treestore_settings = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
+            self.treeview_settings = gtk.TreeView()
+            
+            self.treeview_settings.get_selection().set_mode(gtk.SELECTION_MULTIPLE)
+            hildon.hildon_gtk_tree_view_set_ui_mode(self.treeview_settings, gtk.HILDON_UI_MODE_EDIT)
+            dialog.vbox.pack_start(self.pannableArea)
+            
+            self.treeview_settings.append_column(gtk.TreeViewColumn('Feed Name', gtk.CellRendererText(), text = 0))
+            self.treestore_settings = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
+            self.treeview_settings.set_model(self.treestore_settings)
+            
+            for key in listOfFeeds["feedingit-order"]:
+                title = listOfFeeds[key]["title"]
+                item = self.treestore_settings.append([title, key])
+                if key in self.feed_list:
+                    self.treeview_settings.get_selection().select_iter(item)
+                
+            self.pannableArea.add(self.treeview_settings)
+            self.pannableArea.show_all()
+            dialog.set_default_size(-1, 600)
+            
+            dialog.action_area.pack_start(self.create_autoupdate_picker())
+            
+            dialog.show_all()
+            response = dialog.run()
+    
+            if response == gtk.RESPONSE_ACCEPT:
+                self.feed_list = self.getItems()
+            dialog.destroy()
+            self.save_config()
+            self.update_list()
+        else:
+            dialog = gtk.Dialog("Please add feeds first", None, gtk.DIALOG_DESTROY_WITH_PARENT | gtk.DIALOG_NO_SEPARATOR, (gtk.STOCK_OK, gtk.RESPONSE_ACCEPT))
+            label = gtk.Label("Please add feeds through the main application")
+            dialog.vbox.pack_start(label)
+            dialog.show_all()
+            response = dialog.run()
+            dialog.destroy()
         #self.treeview_settings.get_selection().select_all()
         
     def getItems(self):
@@ -361,13 +375,13 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
                 remove(SOURCE)
 
     def load_config(self):
-            try:
+            if isfile(CONFIGDIR+"widget"):
                 file = open(CONFIGDIR+"widget", "r")
                 self.feed_list = pickle.load( file )
                 self.autoupdate = pickle.load( file )
                 file.close()
                 self.setup_autoupdate()
-            except:
+            elif isfile(CONFIGDIR+"feeds.pickle"):
                 file = open(CONFIGDIR+"feeds.pickle")
                 listOfFeeds = pickle.load(file)
                 file.close()
@@ -377,6 +391,8 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
                     self.feed_list[key] = listOfFeeds[key]["title"]
                 del listOfFeeds
                 self.autoupdate = 0
+            else:
+                self.feed_list = None
 
 
 hd_plugin_type = FeedingItHomePlugin
