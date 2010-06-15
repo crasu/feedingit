@@ -1,3 +1,11 @@
+feedingit (0.7.0-4) unstable; urgency=low
+
+  * UI Improvements (Thp)
+  * Added options to sort the list of feeds (njsf)
+  * Added option to open links in external browser
+
+ -- Yves <yves@marcoz.org>  Tue, 15 Jun 2010 00:03:19 -0800
+
 feedingit (0.7.0-3) unstable; urgency=low
 
   * Fixed re-layout of article listing when switching portrait to/from landscape
