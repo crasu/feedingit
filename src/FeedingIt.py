@@ -608,6 +608,7 @@ class DisplayFeed(hildon.StackableWindow):
         self.feedTitle = title
         self.set_title(title)
         self.key=key
+        self.current = list()
         self.config = config
         self.updateDbusHandler = updateDbusHandler
         
@@ -709,6 +710,7 @@ class DisplayFeed(hildon.StackableWindow):
         #self.pannableFeed.set_property("mov-mode", hildon.MOVEMENT_MODE_BOTH)
         hideReadArticles = self.config.getHideReadArticles()
         hasArticle = False
+        self.current = list()
         for id in self.feed.getIds():
             isRead = False
             try:
@@ -716,11 +718,8 @@ class DisplayFeed(hildon.StackableWindow):
             except:
                 pass
             if not ( isRead and hideReadArticles ):
-            #if not ( self.feed.isEntryRead(id) and self.config.getHideReadArticles() ):
-                #title = self.feed.getTitle(id)
                 title = self.fix_title(self.feed.getTitle(id))
-    
-                #if self.feed.isEntryRead(id):
+                self.current.append(id)
                 if isRead:
                     markup = ENTRY_TEMPLATE % (self.config.getFontSize(), title)
                 else:
@@ -803,38 +802,16 @@ class DisplayFeed(hildon.StackableWindow):
     def nextArticle(self, object, index):
         self.mark_item_read(index)
         id = self.feed.getNextId(index)
-        if self.config.getHideReadArticles():
-            isRead = False
-            try:
-                isRead = self.feed.isEntryRead(id)
-            except:
-                pass
-            while isRead and id != index:
-                id = self.feed.getNextId(id)
-                isRead = False
-                try:
-                       isRead = self.feed.isEntryRead(id)
-                except:
-                       pass
+        while id not in self.current and id != index:
+            id = self.feed.getNextId(id)
         if id != index:
             self.button_clicked(object, id, next=True)
 
     def previousArticle(self, object, index):
         self.mark_item_read(index)
         id = self.feed.getPreviousId(index)
-        if self.config.getHideReadArticles():
-            isRead = False
-            try:
-                isRead = self.feed.isEntryRead(id)
-            except:
-                pass
-            while isRead and id != index:
-                id = self.feed.getPreviousId(id)
-                isRead = False
-                try:
-                       isRead = self.feed.isEntryRead(id)
-                except:
-                       pass
+        while id not in self.current and id != index:
+            id = self.feed.getPreviousId(id)
         if id != index:
             self.button_clicked(object, id, previous=True)
 
