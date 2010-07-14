@@ -1,3 +1,15 @@
+feedingit (0.8.0-0) unstable; urgency=low
+
+  * Modified storage engine to use sqlite3
+
+ -- Yves <yves@marcoz.org>  Tue, 13 Jul 2010 18:05:19 -0800
+
+feedingit (0.7.0-5) unstable; urgency=low
+
+  * [#5946] Make swipe navigation previous article iterate over _generated list_. (njsf)
+
+ -- Yves <yves@marcoz.org>  Mon, 21 Jun 2010 20:28:19 -0800
+
 feedingit (0.7.0-4) unstable; urgency=low
 
   * UI Improvements (Thp)

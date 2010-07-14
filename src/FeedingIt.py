@@ -19,7 +19,7 @@
 # ============================================================================
 __appname__ = 'FeedingIt'
 __author__  = 'Yves Marcoz'
-__version__ = '0.7.0'
+__version__ = '0.8.0'
 __description__ = 'A simple RSS Reader for Maemo 5'
 # ============================================================================
 
@@ -45,7 +45,7 @@ from updatedbus import UpdateServerObject, get_lock
 from config import Config
 from cgi import escape
 
-from rss import Listing
+from rss_sqlite import Listing
 from opml import GetOpmlData, ExportOpmlData
 
 from urllib2 import install_opener, build_opener
@@ -658,8 +658,7 @@ class DisplayFeed(hildon.StackableWindow):
 
     def destroyWindow(self, *args):
         #self.feed.saveUnread(CONFIGDIR)
-        gobject.idle_add(self.feed.saveUnread, CONFIGDIR)
-        self.listing.updateUnread(self.key, self.feed.getNumberOfUnreadItems())
+        self.listing.updateUnread(self.key)
         self.emit("feed-closed", self.key)
         self.destroy()
         #gobject.idle_add(self.feed.saveFeed, CONFIGDIR)
@@ -781,7 +780,6 @@ class DisplayFeed(hildon.StackableWindow):
     def buttonPurgeArticles(self, *widget):
         self.clear()
         self.feed.purgeReadArticles()
-        self.feed.saveUnread(CONFIGDIR)
         self.feed.saveFeed(CONFIGDIR)
         self.displayFeed()
 
@@ -823,7 +821,6 @@ class DisplayFeed(hildon.StackableWindow):
     def onArticleDeleted(self, object, index):
         self.clear()
         self.feed.removeArticle(index)
-        self.feed.saveUnread(CONFIGDIR)
         self.feed.saveFeed(CONFIGDIR)
         self.displayFeed()
 
@@ -858,8 +855,10 @@ class FeedingIt:
         hildon.hildon_gtk_window_set_progress_indicator(self.window, 1)
         self.mainVbox = gtk.VBox(False,10)
         
-        self.introLabel = gtk.Label("Loading...")
-
+        if isfile(CONFIGDIR+"/feeds.db"):           
+            self.introLabel = gtk.Label("Loading...")
+        else:
+            self.introLabel = gtk.Label("Updating database to new format...\nThis can take several minutes.")
         
         self.mainVbox.pack_start(self.introLabel)
 
@@ -977,8 +976,7 @@ class FeedingIt:
             feed = self.listing.getFeed(key)
             for id in feed.getIds():
                 feed.setEntryRead(id)
-            feed.saveUnread(CONFIGDIR)
-            self.listing.updateUnread(key, feed.getNumberOfUnreadItems())
+            self.listing.updateUnread(key)
         self.displayListing()
 
     def button_about_clicked(self, button):
@@ -1014,7 +1012,6 @@ class FeedingIt:
 
     def button_organize_clicked(self, button):
         def after_closing():
-            self.listing.saveConfig()
             self.displayListing()
         SortList(self.window, self.listing, self, after_closing)
 
@@ -1055,35 +1052,16 @@ class FeedingIt:
                 gtk.ICON_LOOKUP_USE_BUILTIN)
 
         self.feedItems.clear()
-        feedInfo = {}
-        count = 0
-        for key in self.listing.getListOfFeeds():
-            unreadItems = self.listing.getFeedNumberOfUnreadItems(key)
-            if unreadItems > 0 or not self.config.getHideReadFeeds():
-                count=count+1
-                title = self.listing.getFeedTitle(key)
-                updateTime = self.listing.getFeedUpdateTime(key)
-                updateStamp = self.listing.getFeedUpdateStamp(key)
-                subtitle = '%s / %d unread items' % (updateTime, unreadItems)
-                feedInfo[key] = [count, unreadItems, updateStamp, title, subtitle, updateTime];
+        order = self.config.getFeedSortOrder()
+        keys = self.listing.getSortedListOfKeys(order)
 
-        order = self.config.getFeedSortOrder();
-        if   order == "Most unread":
-            keyorder = sorted(feedInfo, key = lambda k: feedInfo[k][1], reverse=True)
-        elif order == "Least unread":
-            keyorder = sorted(feedInfo, key = lambda k: feedInfo[k][1])
-        elif order == "Most recent":
-            keyorder = sorted(feedInfo, key = lambda k: feedInfo[k][2], reverse=True)
-        elif order == "Least recent":
-            keyorder = sorted(feedInfo, key = lambda k: feedInfo[k][2])
-        else: # order == "Manual" or invalid value...
-            keyorder = sorted(feedInfo, key = lambda k: feedInfo[k][0])
-        
-        for key in keyorder:
-            unreadItems = feedInfo[key][1]
-            title = xml.sax.saxutils.escape(feedInfo[key][3])
-            subtitle = feedInfo[key][4]
-            updateTime = feedInfo[key][5]
+        for key in keys:
+            unreadItems = self.listing.getFeedNumberOfUnreadItems(key)
+            title = xml.sax.saxutils.escape(self.listing.getFeedTitle(key))
+            updateTime = self.listing.getFeedUpdateTime(key)
+            if updateTime == 0:
+                updateTime = "Never"
+            subtitle = '%s / %d unread items' % (updateTime, unreadItems)
             if unreadItems:
                 markup = FEED_TEMPLATE_UNREAD % (title, subtitle)
             else:
@@ -1125,14 +1103,12 @@ class FeedingIt:
         #self.updateDbusHandler.ArticleCountUpdated()
         
     def onFeedClosedTimeout(self):
-        self.listing.saveConfig()
         del self.feed_lock
         self.updateDbusHandler.ArticleCountUpdated()
      
     def run(self):
         self.window.connect("destroy", gtk.main_quit)
         gtk.main()
-        self.listing.saveConfig()
         del self.app_lock
 
     def prefsClosed(self, *widget):

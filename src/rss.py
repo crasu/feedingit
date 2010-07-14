@@ -378,6 +378,9 @@ class Feed:
             return self.entries[id]
         except:
             return []
+        
+    def getImages(self, id):
+        return self.entries[id]["images"]
     
     def getContent(self, id):
         if self.entries[id].has_key("contentLink"):
