@@ -23,7 +23,7 @@
 # Description : Simple RSS Reader
 # ============================================================================
 
-from rss import Listing
+from rss_sqlite import Listing
 from config import Config
 
 import threading
@@ -42,11 +42,10 @@ del timeout
 from updatedbus import UpdateServerObject, get_lock
 
 class Download(threading.Thread):
-    def __init__(self, listing, config, dbusHandler):
+    def __init__(self, config, dbusHandler):
         global dbug
         threading.Thread.__init__(self)
         self.running = True
-        self.listing = listing
         self.config = config
         self.dbusHandler = dbusHandler
         if dbug:
@@ -59,16 +58,17 @@ class Download(threading.Thread):
         try:
             self.dbusHandler.UpdateStarted()
             (use_proxy, proxy) = self.config.getProxy()
-            for key in self.listing.getListOfFeeds():
+            listing = Listing(CONFIGDIR)
+            for key in listing.getListOfFeeds():
                 if dbug:
                     self.dbug.write("updating %s\n" %key)
                 try:
                     if use_proxy:
                         from urllib2 import install_opener, build_opener
                         install_opener(build_opener(proxy))
-                        self.listing.updateFeed(key, self.config.getExpiry(), proxy=proxy, imageCache=self.config.getImageCache() )
+                        listing.updateFeed(key, self.config.getExpiry(), proxy=proxy, imageCache=self.config.getImageCache() )
                     else:
-                        self.listing.updateFeed(key, self.config.getExpiry(), imageCache=self.config.getImageCache() )
+                        listing.updateFeed(key, self.config.getExpiry(), imageCache=self.config.getImageCache() )
                 except:
                     import traceback
                     file = open("/home/user/.feedingit/feedingit_update.log", "a")
@@ -83,8 +83,11 @@ class Download(threading.Thread):
             if dbug:
                 self.dbug.write("Dbus ArticleCountUpdated signal sent\n")
         except:
-            pass
-        self.listing.saveConfig()
+            import traceback
+            file = open("/home/user/.feedingit/feedingit_update.log", "a")
+            traceback.print_exc(file=file)
+            file.close()
+            #pass
         if dbug:
             self.dbug.write("About to main_quit\n")
         mainloop.quit()
@@ -94,7 +97,6 @@ class Download(threading.Thread):
 
 class FeedUpdate():
     def __init__(self):
-        self.listing = Listing(CONFIGDIR)
         self.config = Config(self, CONFIGDIR+"config.ini")
         self.dbusHandler = UpdateServerObject(self)
         self.updateThread = False
@@ -102,7 +104,7 @@ class FeedUpdate():
     def automaticUpdate(self):
         #self.listing.updateFeeds()
         if self.updateThread == False:
-            self.updateThread = Download(self.listing, self.config, self.dbusHandler)
+            self.updateThread = Download(self.config, self.dbusHandler)
             self.updateThread.start()
         
     def stopUpdate(self):

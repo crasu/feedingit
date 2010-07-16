@@ -49,3 +49,9 @@ class ServerObject(dbus.service.Object):
         #self.app.buttonFeedClicked(None, self.app, None, key)
         self.app.openFeed(key)
         return "Done"
+    
+    @dbus.service.method('org.maemo.feedingit')
+    def OpenArticle(self, key, id):
+        #self.app.buttonFeedClicked(None, self.app, None, key)
+        self.app.openArticle(key, id)
+        return "Done"

@@ -780,7 +780,7 @@ class DisplayFeed(hildon.StackableWindow):
     def buttonPurgeArticles(self, *widget):
         self.clear()
         self.feed.purgeReadArticles()
-        self.feed.saveFeed(CONFIGDIR)
+        #self.feed.saveFeed(CONFIGDIR)
         self.displayFeed()
 
     def destroyArticle(self, handle):
@@ -821,7 +821,7 @@ class DisplayFeed(hildon.StackableWindow):
     def onArticleDeleted(self, object, index):
         self.clear()
         self.feed.removeArticle(index)
-        self.feed.saveFeed(CONFIGDIR)
+        #self.feed.saveFeed(CONFIGDIR)
         self.displayFeed()
 
     def button_update_clicked(self, button):
@@ -842,9 +842,19 @@ class DisplayFeed(hildon.StackableWindow):
         self.updateDbusHandler.ArticleCountUpdated()
         
     def buttonReadAllClicked(self, button):
-        for index in self.feed.getIds():
-            self.feed.setEntryRead(index)
-            self.mark_item_read(index)
+        #self.clear()
+        self.feed.markAllAsRead()
+        it = self.feedItems.get_iter_first()
+        while it is not None:
+            k = self.feedItems.get_value(it, FEED_COLUMN_KEY)
+            title = self.fix_title(self.feed.getTitle(k))
+            markup = ENTRY_TEMPLATE % (self.config.getFontSize(), title)
+            self.feedItems.set_value(it, FEED_COLUMN_MARKUP, markup)
+            it = self.feedItems.iter_next(it)
+        #self.displayFeed()
+        #for index in self.feed.getIds():
+        #    self.feed.setEntryRead(index)
+        #    self.mark_item_read(index)
 
 
 class FeedingIt:
@@ -974,8 +984,9 @@ class FeedingIt:
     def button_markAll(self, button):
         for key in self.listing.getListOfFeeds():
             feed = self.listing.getFeed(key)
-            for id in feed.getIds():
-                feed.setEntryRead(id)
+            feed.markAllAsRead()
+            #for id in feed.getIds():
+            #    feed.setEntryRead(id)
             self.listing.updateUnread(key)
         self.displayListing()
 
@@ -1092,6 +1103,19 @@ class FeedingIt:
                 self.disp = DisplayFeed(self.listing, self.listing.getFeed(key), \
                         self.listing.getFeedTitle(key), key, \
                         self.config, self.updateDbusHandler)
+                self.disp.connect("feed-closed", self.onFeedClosed)
+                
+    def openArticle(self, key, id):
+        try:
+            self.feed_lock
+        except:
+            # If feed_lock doesn't exist, we can open the feed, else we do nothing
+            if key != None:
+                self.feed_lock = get_lock(key)
+                self.disp = DisplayFeed(self.listing, self.listing.getFeed(key), \
+                        self.listing.getFeedTitle(key), key, \
+                        self.config, self.updateDbusHandler)
+                self.disp.button_clicked(None, id)
                 self.disp.connect("feed-closed", self.onFeedClosed)
         
 

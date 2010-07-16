@@ -24,6 +24,10 @@
 # ============================================================================
 #import sys
 
+import sqlite3
+from re import sub
+from htmlentitydefs import name2codepoint
+
 import gtk, pickle, gobject, dbus
 import hildondesktop, hildon
 #from rss import Listing
@@ -37,6 +41,7 @@ dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 from os import environ, remove
 bus = dbus.bus.BusConnection(environ["DBUS_SESSION_BUS_ADDRESS"])
 from os.path import isfile
+from cgi import escape
 
 settings = gtk.settings_get_default()
 color_style = gtk.rc_get_style_by_paths( settings, 'GtkButton', 'osso-logical-colors', gtk.Button)
@@ -61,6 +66,31 @@ def get_font_desc(logicalfontname):
     font_desc = font_style.font_desc
     return font_desc
 
+def unescape(text):
+    def fixup(m):
+        text = m.group(0)
+        if text[:2] == "&#":
+            # character reference
+            try:
+                if text[:3] == "&#x":
+                    return unichr(int(text[3:-1], 16))
+                else:
+                    return unichr(int(text[2:-1]))
+            except ValueError:
+                pass
+        else:
+            # named entity
+            try:
+                text = unichr(name2codepoint[text[1:-1]])
+            except KeyError:
+                pass
+        return text # leave as is
+    return sub("&#?\w+;", fixup, text)
+
+def fix_title(title):
+    return escape(unescape(title).replace("<em>","").replace("</em>","").replace("<nobr>","").replace("</nobr>","").replace("<wbr>",""))
+
+
 class FeedingItHomePlugin(hildondesktop.HomePluginItem):
     def __init__(self):
       __gsignals__ = {
@@ -73,6 +103,9 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
         self.connect("show-settings", self.show_settings)
         self.feed_list = {}
         self.total = 0
+        self.status = 0 # 0=Showing feeds, 1=showing articles
+        self.updateStatus = 0 # 0=Not updating, 1=Update in progress
+        self.pageStatus = 0
         if isfile(SOURCE):
             file = open(SOURCE)
             self.autoupdateId = int(file.read())
@@ -82,26 +115,47 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
         
         vbox = gtk.VBox(False, 0)
         
+        ## Prepare the main HBox
+        self.hbox1 = gtk.HBox(False, 0)
         #self.button = gtk.Button()
-        self.button = hildon.Button(gtk.HILDON_SIZE_AUTO_WIDTH | gtk.HILDON_SIZE_FINGER_HEIGHT, hildon.BUTTON_ARRANGEMENT_VERTICAL)
-        self.button.set_text("FeedingIt","")
-        self.button.set_sensitive(False)
-        self.label1 = self.button.child.child.get_children()[0].get_children()[0]
-        self.label2 = self.button.child.child.get_children()[0].get_children()[1]
-        self.label1.modify_fg(gtk.STATE_INSENSITIVE, default_color)
-        self.label1.modify_font(font_desc)
-        self.label2.modify_fg(gtk.STATE_INSENSITIVE, active_color)
+        self.buttonApp = hildon.Button(gtk.HILDON_SIZE_AUTO_WIDTH | gtk.HILDON_SIZE_FINGER_HEIGHT, hildon.BUTTON_ARRANGEMENT_VERTICAL)
+        #self.buttonApp.set_text("FeedingIt","")
+        #self.button.set_sensitive(False)
+        #self.label1 = self.buttonApp.child.child.get_children()[0].get_children()[0]
+        #self.label2 = self.button.child.child.get_children()[0].get_children()[1]
+        #self.label1.modify_fg(gtk.STATE_INSENSITIVE, default_color)
+        #self.label1.modify_font(font_desc)
+        #self.label2.modify_fg(gtk.STATE_INSENSITIVE, active_color)
         icon_theme = gtk.icon_theme_get_default()
-        pixbuf = icon_theme.load_icon("feedingit", 32, gtk.ICON_LOOKUP_USE_BUILTIN )
+        pixbuf = icon_theme.load_icon("feedingit", 20, gtk.ICON_LOOKUP_USE_BUILTIN )
         image = gtk.Image()
         image.set_from_pixbuf(pixbuf)
-        self.button.set_image(image)
-        self.button.set_image_position(gtk.POS_LEFT)
-
+        self.buttonApp.set_image(image)
+        self.buttonApp.set_image_position(gtk.POS_RIGHT)
         #button = gtk.Button("Update")
-        self.button.connect("clicked", self.button_clicked)
+        self.buttonApp.connect("clicked", self.button_clicked)
+        
+        self.buttonUpdate = hildon.Button(gtk.HILDON_SIZE_AUTO_WIDTH | gtk.HILDON_SIZE_FINGER_HEIGHT, hildon.BUTTON_ARRANGEMENT_VERTICAL)
+        self.buttonUpdate.set_image(gtk.image_new_from_icon_name('general_refresh', gtk.ICON_SIZE_BUTTON))
+        self.buttonUpdate.connect("clicked", self.buttonUpdate_clicked)
+        
+        self.buttonUp = hildon.Button(gtk.HILDON_SIZE_AUTO_WIDTH | gtk.HILDON_SIZE_FINGER_HEIGHT, hildon.BUTTON_ARRANGEMENT_VERTICAL)
+        self.buttonUp.set_image(gtk.image_new_from_icon_name('keyboard_move_up', gtk.ICON_SIZE_BUTTON))
+        self.buttonUp.set_sensitive(False)
+        self.buttonUp.connect("clicked", self.buttonUp_clicked)
+        
+        self.buttonDown = hildon.Button(gtk.HILDON_SIZE_AUTO_WIDTH | gtk.HILDON_SIZE_FINGER_HEIGHT, hildon.BUTTON_ARRANGEMENT_VERTICAL)
+        self.buttonDown.set_image(gtk.image_new_from_icon_name('keyboard_move_down', gtk.ICON_SIZE_BUTTON))
+        self.buttonDown.set_sensitive(False)
+        self.buttonDown.connect("clicked", self.buttonDown_clicked)
+        
+        self.hbox1.pack_start(self.buttonUpdate, expand=False)
+        self.hbox1.pack_start(self.buttonDown, expand=False)
+        self.hbox1.pack_start(self.buttonUp, expand=False)
+        self.hbox1.pack_start(self.buttonApp, expand=False)
+        
         #button.show_all()
-        vbox.pack_start(self.button, expand=False)        
+               
         
         #for feed in ["Slashdot", "Engadget", "Cheez"]:
         #    self.treestore.append([feed, "0"])
@@ -109,16 +163,18 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
         self.update_list()
         name_renderer = gtk.CellRendererText()
         name_renderer.set_property("font-desc", font_desc)
-        unread_renderer = gtk.CellRendererText()
-        unread_renderer.set_property("font-desc", font_desc)        
+        self.unread_renderer = gtk.CellRendererText()
+        self.unread_renderer.set_property("font-desc", font_desc)
+        self.unread_renderer.set_property("xalign", 1.0)
         self.treeview.append_column(gtk.TreeViewColumn('Feed Name', name_renderer, text = 0))
-        self.treeview.append_column(gtk.TreeViewColumn('Unread Items', unread_renderer, text = 1))
+        self.treeview.append_column(gtk.TreeViewColumn('Unread Items', self.unread_renderer, text = 1))
         #selection = self.treeview.get_selection()
         #selection.set_mode(gtk.SELECTION_NONE)
         #self.treeview.get_selection().set_mode(gtk.SELECTION_NONE)
         #hildon.hildon_gtk_tree_view_set_ui_mode(self.treeview, gtk.HILDON_UI_MODE_NORMAL)
         
         vbox.pack_start(self.treeview)
+        vbox.pack_start(self.hbox1, expand=False) 
         
         self.add(vbox)
         self.treeview.connect("hildon-row-tapped", self.row_activated)
@@ -145,71 +201,134 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
         #file.close()
 
     def button_clicked(self, *widget):
-        self.button.set_sensitive(False)
-        self.label1.modify_fg(gtk.STATE_NORMAL, default_color)
-        self.label2.modify_fg(gtk.STATE_NORMAL, active_color)
-        self.update_label("Stopping")
-        remote_object = bus.get_object("org.marcoz.feedingit", # Connection name
-                               "/org/marcoz/feedingit/update" # Object's path
-                              )
-        iface = dbus.Interface(remote_object, 'org.marcoz.feedingit')
-        iface.StopUpdate()
-        
-    def update_label(self, title, value=None):
-        self.button.set_title(title)
-        if value != None:
-            self.button.set_value(value)
+        #self.button.set_sensitive(False)
+        #self.label1.modify_fg(gtk.STATE_NORMAL, default_color)
+        #self.label2.modify_fg(gtk.STATE_NORMAL, active_color)
+        #self.update_label("Stopping")
+        if self.status == 0:
+            remote_object = bus.get_object("org.maemo.feedingit", # Connection name
+                                   "/org/maemo/feedingit" # Object's path
+                                  )
+            iface = dbus.Interface(remote_object, 'org.maemo.feedingit')
         else:
-            self.button.set_value("")
+            self.status = 0
+            self.pageStatus = 0
+            self.buttonUp.set_sensitive(False)
+            self.buttonDown.set_sensitive(False)
+            self.treeview.append_column(gtk.TreeViewColumn('Unread Items', self.unread_renderer, text = 1))
+            self.update_list()
+        #iface.StopUpdate()
+        
+    def buttonUpdate_clicked(self, *widget):
+        remote_object = bus.get_object("org.marcoz.feedingit", # Connection name
+                        "/org/marcoz/feedingit/update" # Object's path
+                        )
+        iface = dbus.Interface(remote_object, 'org.marcoz.feedingit')
+        if self.updateStatus == 0:
+            iface.UpdateAll()
+        else:
+            iface.StopUpdate()
+            
+    def buttonUp_clicked(self, *widget):
+        if self.pageStatus > 0:
+            self.pageStatus -= 1
+        self.show_articles()
+        
+    def buttonDown_clicked(self, *widget):
+        self.pageStatus += 1
+        self.show_articles()
+        
+    def update_label(self, value=None):
+        if value != None:
+            self.buttonApp.set_title(str(value))
+        else:
+            self.buttonApp.set_title("")
 
-    def row_activated(self, treeview, treepath): #, column):
-        (model, iter) = self.treeview.get_selection().get_selected()
-        key = model.get_value(iter, 2)
+    #def row_activated(self, treeview, treepath): #, column):
+    #    (model, iter) = self.treeview.get_selection().get_selected()
+    #    key = model.get_value(iter, 2)
         # Create an object that will proxy for a particular remote object.
-        remote_object = bus.get_object("org.maemo.feedingit", # Connection name
-                               "/org/maemo/feedingit" # Object's path
-                              )
-        iface = dbus.Interface(remote_object, 'org.maemo.feedingit')
-        iface.OpenFeed(key)
+    #    remote_object = bus.get_object("org.maemo.feedingit", # Connection name
+    #                           "/org/maemo/feedingit" # Object's path
+    #                          )
+    #    iface = dbus.Interface(remote_object, 'org.maemo.feedingit')
+    #    iface.OpenFeed(key)
+   
+    def show_articles(self):
+        db = sqlite3.connect(CONFIGDIR+self.key+".d/"+self.key+".db")
+        count = db.execute("SELECT count(*) FROM feed WHERE read=0;").fetchone()[0]
+        if count>0:
+            maxPage = count/10
+            if self.pageStatus > maxPage:
+                self.pageStatus = maxPage
+        rows = db.execute("SELECT id, title FROM feed WHERE read=0 ORDER BY date DESC LIMIT 10 OFFSET ?;", (self.pageStatus*10,) )
+        treestore = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
+        for row in rows:
+            title = fix_title(row[1][0:32])
+            id = row[0]
+            treestore.append((title, id))
+        self.treeview.set_model(treestore)
+    
+    def row_activated(self, treeview, treepath):
+        if self.status == 0:
+            self.status = 1
+            self.pageStatus = 0
+            (model, iter) = self.treeview.get_selection().get_selected()
+            self.key = model.get_value(iter, 2)
+            treeviewcolumn = self.treeview.get_column(1)
+            self.treeview.remove_column(treeviewcolumn)
+            self.show_articles()
+            self.buttonApp.set_image(gtk.image_new_from_icon_name('general_back', gtk.ICON_SIZE_BUTTON))
+            self.buttonUp.set_sensitive(True)
+            self.buttonDown.set_sensitive(True)
+        else:
+            (model, iter) = self.treeview.get_selection().get_selected()
+            id = model.get_value(iter, 1)
+            # Create an object that will proxy for a particular remote object.
+            remote_object = bus.get_object("org.maemo.feedingit", # Connection name
+                                   "/org/maemo/feedingit" # Object's path
+                                  )
+            iface = dbus.Interface(remote_object, 'org.maemo.feedingit')
+            iface.OpenArticle(self.key, id)
+
 
     def update_list(self, *widget):
         #listing = Listing(CONFIGDIR)
-        treestore = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING)
-        
-        if self.feed_list == {}:
-            self.load_config()
-
-        if self.feed_list == None:
-            treestore.append(["Start Application", "", None])
-            self.update_label("No feeds added yet")
-            self.treeview.set_model(treestore)
+        if self.status == 0:
+            treestore = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING)
             
-        else:
-            list = []
-            oldtotal = self.total
-            self.total = 0
-            #for key in listOfFeeds["feedingit-order"]:
-            for key in self.feed_list.keys():
-                try:
-                    file = open(CONFIGDIR+key+".d/unread", "r")
-                    readItems = pickle.load( file )
-                    file.close()
-                    countUnread = 0
-                    for id in readItems.keys():
-                        if readItems[id]==False:
-                            countUnread = countUnread + 1
-                    list.append([self.feed_list[key][0:18], countUnread, key])
-                    self.total += countUnread
-                except:
-                    pass
-            list = sorted(list, key=lambda item: item[1], reverse=True)
-            for item in list[0:8]:
-                treestore.append(item)
-            self.treeview.set_model(treestore)
-            if self.total > oldtotal:
-                self.update_label("%s Unread" %str(self.total), "%s more articles" %str(self.total-oldtotal))
+            if self.feed_list == {}:
+                self.load_config()
+    
+            if self.feed_list == None:
+                treestore.append(["No feeds added yet", "", None])
+                treestore.append(["Start Application", "", None])
+                #self.update_label("No feeds added yet")
+                self.treeview.set_model(treestore)
+                
             else:
-                self.update_label("%s Unread" %str(self.total))
+                list = []
+                oldtotal = self.total
+                self.total = 0
+                #for key in listOfFeeds["feedingit-order"]:
+                db = sqlite3.connect(CONFIGDIR+"feeds.db")
+                for key in self.feed_list.keys():
+                    try:
+                        countUnread = db.execute("SELECT unread FROM feeds WHERE id=?;", (key,)).fetchone()[0]
+                        list.append([self.feed_list[key][0:25], countUnread, key])
+                        self.total += countUnread
+                    except:
+                        pass
+                list = sorted(list, key=lambda item: item[1], reverse=True)
+                count = 0
+                for item in list[0:10]:
+                    count += 1
+                    treestore.append(item)
+                for i in range(count, 10):
+                    treestore.append( ("", "", None) )
+                self.treeview.set_model(treestore)
+                self.buttonApp.set_image(gtk.image_new_from_icon_name('feedingit', gtk.ICON_SIZE_BUTTON))
+                #self.update_label(self.total)
         return True
 
     def create_selector(self, choices, setting):
@@ -250,10 +369,9 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
             return picker
         
     def show_settings(self, widget):
-        if isfile(CONFIGDIR+"feeds.pickle"):
-            file = open(CONFIGDIR+"feeds.pickle")
-            listOfFeeds = pickle.load(file)
-            file.close()
+        if isfile(CONFIGDIR+"feeds.db"):
+            db = sqlite3.connect(CONFIGDIR+"feeds.db")
+            
             dialog = gtk.Dialog("Choose feeds to display", None, gtk.DIALOG_DESTROY_WITH_PARENT | gtk.DIALOG_NO_SEPARATOR, (gtk.STOCK_OK, gtk.RESPONSE_ACCEPT, gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL))
     
             self.pannableArea = hildon.PannableArea()
@@ -269,10 +387,12 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
             self.treestore_settings = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
             self.treeview_settings.set_model(self.treestore_settings)
             
-            for key in listOfFeeds["feedingit-order"]:
-                title = listOfFeeds[key]["title"]
-                item = self.treestore_settings.append([title, key])
-                if key in self.feed_list:
+            feeds = db.execute("SELECT title, id FROM feeds;")
+            
+            for feed in feeds:
+                # feed is (id, title)
+                item = self.treestore_settings.append(feed)
+                if feed[1] in self.feed_list:
                     self.treeview_settings.get_selection().select_iter(item)
                 
             self.pannableArea.add(self.treeview_settings)
@@ -315,12 +435,12 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
                         signal_name="UpdateFinished", path="/org/marcoz/feedingit/update")
 
     def update_started(self, *widget):
-        self.button.set_sensitive(True)
-        self.update_label("Updating...", "Click to stop update")
+        self.buttonUpdate.set_image(gtk.image_new_from_icon_name('general_stop', gtk.ICON_SIZE_BUTTON))
+        self.updateStatus = 1
 
     def update_finished(self, *widget):
-        self.button.set_sensitive(False)
-        self.update_label("Update done")
+        self.updateStatus = 0
+        self.buttonUpdate.set_image(gtk.image_new_from_icon_name('general_refresh', gtk.ICON_SIZE_BUTTON))
         
     def start_update(self):
         try:
@@ -381,15 +501,12 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
                 self.autoupdate = pickle.load( file )
                 file.close()
                 self.setup_autoupdate()
-            elif isfile(CONFIGDIR+"feeds.pickle"):
-                file = open(CONFIGDIR+"feeds.pickle")
-                listOfFeeds = pickle.load(file)
-                file.close()
+            elif isfile(CONFIGDIR+"feeds.db"):
+                db = sqlite3.connect(CONFIGDIR+"feeds.db")
+                feeds = db.execute("SELECT id, title FROM feeds;")
             
-                #self.feed_list = listOfFeeds["feedingit-order"]
-                for key in listOfFeeds["feedingit-order"]:
-                    self.feed_list[key] = listOfFeeds[key]["title"]
-                del listOfFeeds
+                for feed in feeds:
+                    self.feed_list[feed[0]] = feed[1]
                 self.autoupdate = 0
             else:
                 self.feed_list = None

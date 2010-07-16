@@ -135,7 +135,6 @@ class Feed:
                             filename = self.addImage(configdir, self.key, baseurl, img['src'])
                             img['src']=filename
                             self.db.execute("INSERT INTO images (id, imagePath) VALUES (?, ?);", (id, filename) )
-                            self.db.commit()
                           except:
                               import traceback
                               traceback.print_exc()
@@ -146,7 +145,6 @@ class Feed:
                    file.close()
                    values = (id, tmpEntry["title"], tmpEntry["contentLink"], tmpEntry["date"], currentTime, tmpEntry["link"], 0)
                    self.db.execute("INSERT INTO feed (id, title, contentLink, date, updated, link, read) VALUES (?, ?, ?, ?, ?, ?, ?);", values)
-                   self.db.commit() 
                else:
                    try:
                        filename = configdir+self.key+".d/"+id+".html"
@@ -160,6 +158,7 @@ class Feed:
                             file.close()
                    except:
                        pass
+           self.db.commit()
             
            
            rows = self.db.execute("SELECT id FROM feed WHERE (read=0 AND updated<?) OR (read=1 AND updated<?);", (2*expiry, expiry))
@@ -199,6 +198,10 @@ class Feed:
     def setEntryUnread(self, id):
         self.db.execute("UPDATE feed SET read=0 WHERE id=?;", (id,) )
         self.db.commit()     
+        
+    def markAllAsRead(self):
+        self.db.execute("UPDATE feed SET read=1 WHERE read=0;")
+        self.db.commit()
 
     def isEntryRead(self, id):
         read_status = self.db.execute("SELECT read FROM feed WHERE id=?;", (id,) ).fetchone()[0]
@@ -228,11 +231,11 @@ class Feed:
         return getId(str(entry["date"]) + str(entry["title"]))
     
     def getIds(self):
-        rows = self.db.execute("SELECT id FROM feed;").fetchall()
+        rows = self.db.execute("SELECT id FROM feed ORDER BY date DESC;").fetchall()
         ids = []
         for row in rows:
             ids.append(row[0])
-        ids.reverse()
+        #ids.reverse()
         return ids
     
     def getNextId(self, id):
@@ -316,7 +319,7 @@ class Feed:
 class ArchivedArticles(Feed):    
     def addArchivedArticle(self, title, link, date, configdir):
         id = self.generateUniqueId({"date":date, "title":title})
-        values = (id, title, None, date, 0, link, 0)
+        values = (id, title, link, date, 0, link, 0)
         self.db.execute("INSERT INTO feed (id, title, contentLink, date, updated, link, read) VALUES (?, ?, ?, ?, ?, ?, ?);", values)
         self.db.commit()
 
@@ -336,6 +339,7 @@ class ArchivedArticles(Feed):
             for img in images:
                 filename = self.addImage(configdir, self.key, baseurl, img['src'])
                 img['src']=filename
+                self.db.execute("INSERT INTO images (id, imagePath) VALUES (?, ?);", (id, filename) )
             contentLink = configdir+self.key+".d/"+id+".html"
             file = open(contentLink, "w")
             file.write(soup.prettify())
@@ -346,12 +350,20 @@ class ArchivedArticles(Feed):
         return (currentTime, None, None)
     
     def purgeReadArticles(self):
-        rows = self.db.execute("SELECT id FROM feed WHERE read=0;")
-        ids = self.getIds()
+        rows = self.db.execute("SELECT id FROM feed WHERE read=1;")
+        #ids = self.getIds()
         for row in rows:
-            self.removeEntry(row[0])
+            self.removeArticle(row[0])
                 
     def removeArticle(self, id):
+        rows = self.db.execute("SELECT imagePath FROM images WHERE id=?;", (id,) )
+        for row in rows:
+            try:
+                count = self.db.execute("SELECT count(*) FROM images WHERE id!=? and imagePath=?;", (id,row[0]) ).fetchone()[0]
+                if count == 0:
+                    os.remove(row[0])
+            except:
+                pass
         self.removeEntry(id)
 
 class Listing:
@@ -393,13 +405,19 @@ class Listing:
                             read_status = 1
                         else:
                             read_status = 0 
-                        values = (item, feed.getTitle(item), feed.getContentLink(item), time.time(), time.time(), feed.getExternalLink(item), read_status)
+                        date = time.mktime(feed.getDateTuple(item))
+                        title = feed.getTitle(item)
+                        newId = new_feed.generateUniqueId({"date":date, "title":title})
+                        values = (newId, title , feed.getContentLink(item), date, time.time(), feed.getExternalLink(item), read_status)
                         new_feed.db.execute("INSERT INTO feed (id, title, contentLink, date, updated, link, read) VALUES (?, ?, ?, ?, ?, ?, ?);", values)
                         new_feed.db.commit()
-                        images = feed.getImages(item)
-                        for image in images:
-                            new_feed.db.execute("INSERT INTO images (id, imagePath) VALUES (?, ?);", (item, image) )
-                            new_feed.db.commit()
+                        try:
+                            images = feed.getImages(item)
+                            for image in images:
+                                new_feed.db.execute("INSERT INTO images (id, imagePath) VALUES (?, ?);", (item, image) )
+                                new_feed.db.commit()
+                        except:
+                            pass
                 self.updateUnread(id)
             except:
                 import traceback
@@ -427,6 +445,7 @@ class Listing:
         (updateTime, etag, modified) = feed.updateFeed(self.configdir, url, etag, eval(modified), expiryTime, proxy, imageCache)
         db.execute("UPDATE feeds SET updateTime=?, etag=?, modified=? WHERE id=?;", (updateTime, etag, str(modified), key) )
         db.commit()
+        self.updateUnread(key, db=db)
         
     def getFeed(self, key):
         if key == "ArchivedArticles":
@@ -488,10 +507,12 @@ class Listing:
         else:
             return False
         
-    def updateUnread(self, key):
+    def updateUnread(self, key, db=None):
+        if db == None:
+            db = self.db
         feed = self.getFeed(key)
-        self.db.execute("UPDATE feeds SET unread=? WHERE id=?;", (feed.getNumberOfUnreadItems(), key))
-        self.db.commit()
+        db.execute("UPDATE feeds SET unread=? WHERE id=?;", (feed.getNumberOfUnreadItems(), key))
+        db.commit()
 
     def addFeed(self, title, url, id=None):
         if not id:
