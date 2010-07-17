@@ -30,7 +30,7 @@ from gobject import idle_add
 from gconf import client_get_default
 from urllib2 import ProxyHandler
 
-VERSION = "48"
+VERSION = "52"
 
 section = "FeedingIt"
 ranges = { "updateInterval":[0.5, 1, 2, 4, 12, 24], "expiry":[24, 48, 72], "fontSize":range(12,24), "orientation":["Automatic", "Landscape", "Portrait"], "artFontSize":[10, 12, 14, 16, 18, 20], "feedsort":["Manual", "Most unread", "Least unread", "Most recent", "Least recent"] }

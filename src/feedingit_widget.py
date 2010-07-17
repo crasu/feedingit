@@ -150,8 +150,8 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
         self.buttonDown.connect("clicked", self.buttonDown_clicked)
         
         self.hbox1.pack_start(self.buttonUpdate, expand=False)
-        self.hbox1.pack_start(self.buttonDown, expand=False)
         self.hbox1.pack_start(self.buttonUp, expand=False)
+        self.hbox1.pack_start(self.buttonDown, expand=False)
         self.hbox1.pack_start(self.buttonApp, expand=False)
         
         #button.show_all()
@@ -163,11 +163,17 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
         self.update_list()
         name_renderer = gtk.CellRendererText()
         name_renderer.set_property("font-desc", font_desc)
+        name_renderer.set_property('background', "#333333")
         self.unread_renderer = gtk.CellRendererText()
         self.unread_renderer.set_property("font-desc", font_desc)
         self.unread_renderer.set_property("xalign", 1.0)
-        self.treeview.append_column(gtk.TreeViewColumn('Feed Name', name_renderer, text = 0))
-        self.treeview.append_column(gtk.TreeViewColumn('Unread Items', self.unread_renderer, text = 1))
+        self.unread_renderer.set_property('background', "#333333")
+        column_unread = gtk.TreeViewColumn('Unread Items', self.unread_renderer, text = 1)
+        column_unread.set_expand(False)
+        column_name = gtk.TreeViewColumn('Feed Name', name_renderer, text = 0)
+        column_name.set_expand(True)
+        self.treeview.append_column(column_name)
+        self.treeview.append_column(column_unread)
         #selection = self.treeview.get_selection()
         #selection.set_mode(gtk.SELECTION_NONE)
         #self.treeview.get_selection().set_mode(gtk.SELECTION_NONE)
@@ -210,6 +216,7 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
                                    "/org/maemo/feedingit" # Object's path
                                   )
             iface = dbus.Interface(remote_object, 'org.maemo.feedingit')
+            iface.OpenFeed(None)
         else:
             self.status = 0
             self.pageStatus = 0
