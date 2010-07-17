@@ -1,8 +1,9 @@
-feedingit (0.8.0-0) unstable; urgency=low
+feedingit (0.8.0-1) unstable; urgency=low
 
   * Modified storage engine to use sqlite3
+  * Updated widget with possibility of showing article listing
 
- -- Yves <yves@marcoz.org>  Tue, 13 Jul 2010 18:05:19 -0800
+ -- Yves <yves@marcoz.org>  Fri, 16 Jul 2010 23:34:19 -0800
 
 feedingit (0.7.0-5) unstable; urgency=low
 

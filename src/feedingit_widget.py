@@ -30,6 +30,7 @@ from htmlentitydefs import name2codepoint
 
 import gtk, pickle, gobject, dbus
 import hildondesktop, hildon
+from pango import ELLIPSIZE_END
 #from rss import Listing
 
 # Create a session bus.
@@ -164,13 +165,14 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
         name_renderer = gtk.CellRendererText()
         name_renderer.set_property("font-desc", font_desc)
         name_renderer.set_property('background', "#333333")
+        name_renderer.set_property('ellipsize', ELLIPSIZE_END)
         self.unread_renderer = gtk.CellRendererText()
         self.unread_renderer.set_property("font-desc", font_desc)
         self.unread_renderer.set_property("xalign", 1.0)
         self.unread_renderer.set_property('background', "#333333")
         column_unread = gtk.TreeViewColumn('Unread Items', self.unread_renderer, text = 1)
         column_unread.set_expand(False)
-        column_name = gtk.TreeViewColumn('Feed Name', name_renderer, text = 0)
+        column_name = gtk.TreeViewColumn('Feed Name', name_renderer, markup = 0)
         column_name.set_expand(True)
         self.treeview.append_column(column_name)
         self.treeview.append_column(column_unread)
@@ -186,6 +188,7 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
         self.treeview.connect("hildon-row-tapped", self.row_activated)
         #self.treeview.connect("cursor-changed", self.cursor_changed)
         vbox.show_all()
+        self.set_resize_mode(gtk.RESIZE_QUEUE)
         self.setupDbus()
         #gobject.timeout_add_seconds(30*60, self.update_list)
       except:
@@ -271,7 +274,8 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
         rows = db.execute("SELECT id, title FROM feed WHERE read=0 ORDER BY date DESC LIMIT 10 OFFSET ?;", (self.pageStatus*10,) )
         treestore = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
         for row in rows:
-            title = fix_title(row[1][0:32])
+            #title = fix_title(row[1][0:32])
+            title = fix_title(row[1])
             id = row[0]
             treestore.append((title, id))
         self.treeview.set_model(treestore)
@@ -322,7 +326,8 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
                 for key in self.feed_list.keys():
                     try:
                         countUnread = db.execute("SELECT unread FROM feeds WHERE id=?;", (key,)).fetchone()[0]
-                        list.append([self.feed_list[key][0:25], countUnread, key])
+                        #list.append([self.feed_list[key][0:25], countUnread, key])
+                        list.append([self.feed_list[key], countUnread, key])
                         self.total += countUnread
                     except:
                         pass
