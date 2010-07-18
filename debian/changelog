@@ -1,3 +1,10 @@
+feedingit (0.8.0-3) unstable; urgency=low
+
+  * Updated feed/article cell size in widget
+  * Updated hide read feed option
+
+ -- Yves <yves@marcoz.org>  Sun, 18 Jul 2010 01:40:19 -0800
+
 feedingit (0.8.0-1) unstable; urgency=low
 
   * Modified storage engine to use sqlite3

@@ -230,8 +230,11 @@ class Feed:
     def generateUniqueId(self, entry):
         return getId(str(entry["date"]) + str(entry["title"]))
     
-    def getIds(self):
-        rows = self.db.execute("SELECT id FROM feed ORDER BY date DESC;").fetchall()
+    def getIds(self, onlyUnread=False):
+        if onlyUnread:
+            rows = self.db.execute("SELECT id FROM feed where read=0 ORDER BY date DESC;").fetchall()
+        else:
+            rows = self.db.execute("SELECT id FROM feed ORDER BY date DESC;").fetchall()
         ids = []
         for row in rows:
             ids.append(row[0])
@@ -476,23 +479,26 @@ class Listing:
                 keys.append(row[0])
         return keys
     
-    def getSortedListOfKeys(self, order):
+    def getSortedListOfKeys(self, order, onlyUnread=False):
         if   order == "Most unread":
-            tmp = "ORDER BY unread"
+            tmp = "ORDER BY unread DESC"
             #keyorder = sorted(feedInfo, key = lambda k: feedInfo[k][1], reverse=True)
         elif order == "Least unread":
-            tmp = "ORDER BY unread DESC"
+            tmp = "ORDER BY unread"
             #keyorder = sorted(feedInfo, key = lambda k: feedInfo[k][1])
         elif order == "Most recent":
-            tmp = "ORDER BY updateTime"
+            tmp = "ORDER BY updateTime DESC"
             #keyorder = sorted(feedInfo, key = lambda k: feedInfo[k][2], reverse=True)
         elif order == "Least recent":
-            tmp = "ORDER BY updateTime DESC"
+            tmp = "ORDER BY updateTime"
             #keyorder = sorted(feedInfo, key = lambda k: feedInfo[k][2])
         else: # order == "Manual" or invalid value...
             tmp = "ORDER BY rank"
             #keyorder = sorted(feedInfo, key = lambda k: feedInfo[k][0])
-        sql = "SELECT id FROM feeds " + tmp
+        if onlyUnread:
+            sql = "SELECT id FROM feeds WHERE unread>0 " + tmp
+        else:
+            sql = "SELECT id FROM feeds " + tmp
         rows = self.db.execute(sql)
         keys = []
         for row in rows:

@@ -708,9 +708,14 @@ class DisplayFeed(hildon.StackableWindow):
 
         #self.pannableFeed.set_property("mov-mode", hildon.MOVEMENT_MODE_BOTH)
         hideReadArticles = self.config.getHideReadArticles()
+        if hideReadArticles:
+            articles = self.feed.getIds(onlyUnread=True)
+        else:
+            articles = self.feed.getIds()
+        
         hasArticle = False
         self.current = list()
-        for id in self.feed.getIds():
+        for id in articles:
             isRead = False
             try:
                 isRead = self.feed.isEntryRead(id)
@@ -1063,8 +1068,9 @@ class FeedingIt:
                 gtk.ICON_LOOKUP_USE_BUILTIN)
 
         self.feedItems.clear()
+        hideReadFeed = self.config.getHideReadFeeds()
         order = self.config.getFeedSortOrder()
-        keys = self.listing.getSortedListOfKeys(order)
+        keys = self.listing.getSortedListOfKeys(order, onlyUnread=hideReadFeed)
 
         for key in keys:
             unreadItems = self.listing.getFeedNumberOfUnreadItems(key)
