@@ -92,9 +92,17 @@ MARKUP_TEMPLATE_ENTRY = '<span font_desc="%s italic %%s" foreground="%s">%%s</sp
 head_font = style.get_font_desc('SystemFont')
 sub_font = style.get_font_desc('SmallSystemFont')
 
-head_color = style.get_color('ButtonTextColor')
+#head_color = style.get_color('ButtonTextColor')
+head_color = style.get_color('DefaultTextColor')
 sub_color = style.get_color('DefaultTextColor')
 active_color = style.get_color('ActiveTextColor')
+
+bg_color = style.get_color('DefaultBackgroundColor').to_string()
+c1=hex(min(int(bg_color[1:5],16)+10000, 65535))[2:6]
+c2=hex(min(int(bg_color[5:9],16)+10000, 65535))[2:6]
+c3=hex(min(int(bg_color[9:],16)+10000, 65535))[2:6]
+bg_color = "#" + c1 + c2 + c3
+
 
 head = MARKUP_TEMPLATE % (head_font.to_string(), head_color.to_string())
 normal_sub = MARKUP_TEMPLATE % (sub_font.to_string(), sub_color.to_string())
@@ -675,6 +683,8 @@ class DisplayFeed(hildon.StackableWindow):
         self.feedItems = gtk.ListStore(str, str)
         #self.feedList = gtk.TreeView(self.feedItems)
         self.feedList = hildon.GtkTreeView(gtk.HILDON_UI_MODE_NORMAL)
+        self.feedList.set_rules_hint(True)
+
         selection = self.feedList.get_selection()
         selection.set_mode(gtk.SELECTION_NONE)
         #selection.connect("changed", lambda w: True)
@@ -697,10 +707,10 @@ class DisplayFeed(hildon.StackableWindow):
 
         self.markup_renderer = gtk.CellRendererText()
         self.markup_renderer.set_property('wrap-mode', pango.WRAP_WORD_CHAR)
-        self.markup_renderer.set_property('background', "#333333")
+        self.markup_renderer.set_property('background', bg_color) #"#333333")
         (width, height) = self.get_size()
         self.markup_renderer.set_property('wrap-width', width-20)
-        self.markup_renderer.set_property('ypad', 5)
+        self.markup_renderer.set_property('ypad', 8)
         self.markup_renderer.set_property('xpad', 5)
         markup_column = gtk.TreeViewColumn('', self.markup_renderer, \
                 markup=FEED_COLUMN_MARKUP)

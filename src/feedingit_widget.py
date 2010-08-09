@@ -102,17 +102,21 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
         hildondesktop.HomePluginItem.__init__(self)
         self.set_settings(True)
         self.connect("show-settings", self.show_settings)
-        self.feed_list = {}
+        self.initialized = False
         self.total = 0
         self.status = 0 # 0=Showing feeds, 1=showing articles
         self.updateStatus = 0 # 0=Not updating, 1=Update in progress
         self.pageStatus = 0
+        self.pageSize = 10
+        self.size = 1 # 1=Big widget, 0=small widget
+        
         if isfile(SOURCE):
             file = open(SOURCE)
             self.autoupdateId = int(file.read())
             file.close() 
         else:
             self.autoupdateId=False
+        self.load_config()
         
         vbox = gtk.VBox(False, 0)
         
@@ -140,19 +144,21 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
         self.buttonUpdate.set_image(gtk.image_new_from_icon_name('general_refresh', gtk.ICON_SIZE_BUTTON))
         self.buttonUpdate.connect("clicked", self.buttonUpdate_clicked)
         
-        self.buttonUp = hildon.Button(gtk.HILDON_SIZE_AUTO_WIDTH | gtk.HILDON_SIZE_FINGER_HEIGHT, hildon.BUTTON_ARRANGEMENT_VERTICAL)
-        self.buttonUp.set_image(gtk.image_new_from_icon_name('keyboard_move_up', gtk.ICON_SIZE_BUTTON))
-        self.buttonUp.set_sensitive(False)
-        self.buttonUp.connect("clicked", self.buttonUp_clicked)
-        
-        self.buttonDown = hildon.Button(gtk.HILDON_SIZE_AUTO_WIDTH | gtk.HILDON_SIZE_FINGER_HEIGHT, hildon.BUTTON_ARRANGEMENT_VERTICAL)
-        self.buttonDown.set_image(gtk.image_new_from_icon_name('keyboard_move_down', gtk.ICON_SIZE_BUTTON))
-        self.buttonDown.set_sensitive(False)
-        self.buttonDown.connect("clicked", self.buttonDown_clicked)
+        if self.size==1:
+            self.buttonUp = hildon.Button(gtk.HILDON_SIZE_AUTO_WIDTH | gtk.HILDON_SIZE_FINGER_HEIGHT, hildon.BUTTON_ARRANGEMENT_VERTICAL)
+            self.buttonUp.set_image(gtk.image_new_from_icon_name('keyboard_move_up', gtk.ICON_SIZE_BUTTON))
+            self.buttonUp.set_sensitive(False)
+            self.buttonUp.connect("clicked", self.buttonUp_clicked)
+            
+            self.buttonDown = hildon.Button(gtk.HILDON_SIZE_AUTO_WIDTH | gtk.HILDON_SIZE_FINGER_HEIGHT, hildon.BUTTON_ARRANGEMENT_VERTICAL)
+            self.buttonDown.set_image(gtk.image_new_from_icon_name('keyboard_move_down', gtk.ICON_SIZE_BUTTON))
+            self.buttonDown.set_sensitive(False)
+            self.buttonDown.connect("clicked", self.buttonDown_clicked)
         
         self.hbox1.pack_start(self.buttonUpdate, expand=False)
-        self.hbox1.pack_start(self.buttonUp, expand=False)
-        self.hbox1.pack_start(self.buttonDown, expand=False)
+        if self.size==1:
+            self.hbox1.pack_start(self.buttonUp, expand=False)
+            self.hbox1.pack_start(self.buttonDown, expand=False)
         self.hbox1.pack_start(self.buttonApp, expand=False)
         
         #button.show_all()
@@ -223,8 +229,9 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
         else:
             self.status = 0
             self.pageStatus = 0
-            self.buttonUp.set_sensitive(False)
-            self.buttonDown.set_sensitive(False)
+            if self.size == 1:
+                self.buttonUp.set_sensitive(False)
+                self.buttonDown.set_sensitive(False)
             self.treeview.append_column(gtk.TreeViewColumn('Unread Items', self.unread_renderer, text = 1))
             self.update_list()
         #iface.StopUpdate()
@@ -268,10 +275,12 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
         db = sqlite3.connect(CONFIGDIR+self.key+".d/"+self.key+".db")
         count = db.execute("SELECT count(*) FROM feed WHERE read=0;").fetchone()[0]
         if count>0:
-            maxPage = count/10
+            maxPage = count/self.pageSize
+            print maxPage
             if self.pageStatus > maxPage:
                 self.pageStatus = maxPage
-        rows = db.execute("SELECT id, title FROM feed WHERE read=0 ORDER BY date DESC LIMIT 10 OFFSET ?;", (self.pageStatus*10,) )
+            print self.pageStatus
+        rows = db.execute("SELECT id, title FROM feed WHERE read=0 ORDER BY date DESC LIMIT ? OFFSET ?;", (self.pageSize, self.pageStatus*self.pageSize,) )
         treestore = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
         for row in rows:
             #title = fix_title(row[1][0:32])
@@ -282,16 +291,25 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
     
     def row_activated(self, treeview, treepath):
         if self.status == 0:
-            self.status = 1
-            self.pageStatus = 0
-            (model, iter) = self.treeview.get_selection().get_selected()
-            self.key = model.get_value(iter, 2)
-            treeviewcolumn = self.treeview.get_column(1)
-            self.treeview.remove_column(treeviewcolumn)
-            self.show_articles()
-            self.buttonApp.set_image(gtk.image_new_from_icon_name('general_back', gtk.ICON_SIZE_BUTTON))
-            self.buttonUp.set_sensitive(True)
-            self.buttonDown.set_sensitive(True)
+            if self.size == 1:
+                self.status = 1
+                self.pageStatus = 0
+                (model, iter) = self.treeview.get_selection().get_selected()
+                self.key = model.get_value(iter, 2)
+                treeviewcolumn = self.treeview.get_column(1)
+                self.treeview.remove_column(treeviewcolumn)
+                self.show_articles()
+                self.buttonApp.set_image(gtk.image_new_from_icon_name('general_back', gtk.ICON_SIZE_BUTTON))
+                self.buttonUp.set_sensitive(True)
+                self.buttonDown.set_sensitive(True)
+            else:
+                (model, iter) = self.treeview.get_selection().get_selected()
+                id = model.get_value(iter, 2)
+                remote_object = bus.get_object("org.maemo.feedingit", # Connection name
+                                   "/org/maemo/feedingit" # Object's path
+                                  )
+                iface = dbus.Interface(remote_object, 'org.maemo.feedingit')
+                iface.OpenFeed(id)
         else:
             (model, iter) = self.treeview.get_selection().get_selected()
             id = model.get_value(iter, 1)
@@ -302,46 +320,54 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
             iface = dbus.Interface(remote_object, 'org.maemo.feedingit')
             iface.OpenArticle(self.key, id)
 
+    def check_db(self, db):
+        table = db.execute("SELECT sql FROM sqlite_master").fetchone()
+        from string import find
+        if find(table[0], "widget")==-1:
+                db.execute("ALTER TABLE feeds ADD COLUMN widget int;")
+                db.execute("UPDATE feeds SET widget=1;")
+                db.commit()
+
+    def no_feeds_available(self, treestore):
+        treestore.append(["No feeds added yet", "", None])
+        treestore.append(["Start Application", "", None])
+        #self.update_label("No feeds added yet")
+        self.treeview.set_model(treestore)
 
     def update_list(self, *widget):
         #listing = Listing(CONFIGDIR)
-        if self.status == 0:
-            treestore = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING)
-            
-            if self.feed_list == {}:
-                self.load_config()
-    
-            if self.feed_list == None:
-                treestore.append(["No feeds added yet", "", None])
-                treestore.append(["Start Application", "", None])
-                #self.update_label("No feeds added yet")
-                self.treeview.set_model(treestore)
+        try:
+            if self.status == 0:
+                treestore = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING, gobject.TYPE_STRING)
                 
-            else:
-                list = []
-                oldtotal = self.total
-                self.total = 0
-                #for key in listOfFeeds["feedingit-order"]:
-                db = sqlite3.connect(CONFIGDIR+"feeds.db")
-                for key in self.feed_list.keys():
-                    try:
-                        countUnread = db.execute("SELECT unread FROM feeds WHERE id=?;", (key,)).fetchone()[0]
-                        #list.append([self.feed_list[key][0:25], countUnread, key])
-                        list.append([self.feed_list[key], countUnread, key])
-                        self.total += countUnread
-                    except:
-                        pass
-                list = sorted(list, key=lambda item: item[1], reverse=True)
-                count = 0
-                for item in list[0:10]:
-                    count += 1
-                    treestore.append(item)
-                for i in range(count, 10):
-                    treestore.append( ("", "", None) )
+                #if self.feed_list == {}:
+                if self.initialized == False:
+                    self.load_config()
+                try:
+                    db = sqlite3.connect(CONFIGDIR+"feeds.db")
+                except:
+                    self.no_feeds_available(treestore)
+                    return True
+                try:
+                    rows = db.execute("SELECT id, title, unread FROM feeds WHERE widget=1 ORDER BY unread DESC LIMIT 10;")
+                except:
+                    self.check_db(db)
+                    rows = db.execute("SELECT id, title, unread FROM feeds WHERE widget=1 ORDER BY unread DESC LIMIT 10;")
+                self.pageSize = 0
+                for row in rows:
+                    self.pageSize += 1
+                    id = row[0]
+                    countUnread = row[2]
+                    name = row[1]
+                    treestore.append([name, countUnread, id])
                 self.treeview.set_model(treestore)
                 self.buttonApp.set_image(gtk.image_new_from_icon_name('feedingit', gtk.ICON_SIZE_BUTTON))
-                #self.update_label(self.total)
-        return True
+            return True
+        except:
+          import traceback
+          file = open("/home/user/feedingit_widget.log", "a")
+          traceback.print_exc(file=file)
+          file.close()
 
     def create_selector(self, choices, setting):
         #self.pickerDialog = hildon.PickerDialog(self.parent)
@@ -358,10 +384,16 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
         
     def selection_changed(self, selector, button, setting):
         tmp = selector.get_current_text()
-        if tmp == "Disabled":
-            self.autoupdate = 0
-        else:
-            self.autoupdate = tmp
+        if setting == "autoupdate":
+            if tmp == "Disabled":
+                self.autoupdate = 0
+            else:
+                self.autoupdate = tmp
+        elif setting == "sizing":
+            if tmp == "Large":
+                self.size=1
+            else:
+                self.size=0
         #current_selection = selector.get_current_text()
         #if current_selection:
         #    self.config[setting] = current_selection
@@ -374,6 +406,22 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
             picker.set_selector(selector)
             picker.set_title("Frequency of updates from the widget")
             picker.set_text("Setup Feed Auto-updates","Update every %s hours" %str(self.autoupdate) )
+            picker.set_name('HildonButton-finger')
+            picker.set_alignment(0,0,1,1)
+            #self.buttons[setting] = picker
+            #vbox.pack_start(picker, expand=False)
+            return picker
+        
+    def create_size_picker(self):
+            picker = hildon.PickerButton(gtk.HILDON_SIZE_FINGER_HEIGHT, hildon.BUTTON_ARRANGEMENT_VERTICAL)
+            selector = self.create_selector(["Small", "Large"], "sizing")
+            picker.set_selector(selector)
+            picker.set_title("Default Size For The Widget")
+            if self.size ==1:
+                tmp = "Large"
+            else:
+                tmp = "Small"
+            picker.set_text("Widget Size (requires restart)", tmp)
             picker.set_name('HildonButton-finger')
             picker.set_alignment(0,0,1,1)
             #self.buttons[setting] = picker
@@ -399,12 +447,12 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
             self.treestore_settings = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
             self.treeview_settings.set_model(self.treestore_settings)
             
-            feeds = db.execute("SELECT title, id FROM feeds;")
+            feeds = db.execute("SELECT title, id, widget FROM feeds;")
             
             for feed in feeds:
                 # feed is (id, title)
-                item = self.treestore_settings.append(feed)
-                if feed[1] in self.feed_list:
+                item = self.treestore_settings.append(feed[0:2])
+                if feed[2]==1:
                     self.treeview_settings.get_selection().select_iter(item)
                 
             self.pannableArea.add(self.treeview_settings)
@@ -412,12 +460,13 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
             dialog.set_default_size(-1, 600)
             
             dialog.action_area.pack_start(self.create_autoupdate_picker())
+            dialog.action_area.pack_start(self.create_size_picker())
             
             dialog.show_all()
             response = dialog.run()
     
             if response == gtk.RESPONSE_ACCEPT:
-                self.feed_list = self.getItems()
+                self.getItems()
             dialog.destroy()
             self.save_config()
             self.update_list()
@@ -434,9 +483,15 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
         list = {}
         treeselection = self.treeview_settings.get_selection()
         (model, pathlist) = treeselection.get_selected_rows()
+        db = sqlite3.connect(CONFIGDIR+"feeds.db")
+        db.execute("UPDATE feeds SET widget=0;")
         for path in pathlist:
-            list[model.get_value(model.get_iter(path),1)] = model.get_value(model.get_iter(path),0)
-        return list
+            id = model.get_value(model.get_iter(path),1)
+            db.execute("UPDATE feeds SET widget=1 WHERE id=?;", (id,) )
+        db.commit()
+            #title = model.get_value(model.get_iter(path),0)
+            #list[model.get_value(model.get_iter(path),1)] = model.get_value(model.get_iter(path),0)
+        #return list
         
     def setupDbus(self):
         bus.add_signal_receiver(self.update_list, dbus_interface="org.marcoz.feedingit",
@@ -479,8 +534,8 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
             if not isdir(CONFIGDIR):
                 from os import mkdir
                 mkdir(CONFIGDIR)
-            file = open(CONFIGDIR+"widget", "w")
-            pickle.dump(self.feed_list, file )
+            file = open(CONFIGDIR+"widget2", "w")
+            pickle.dump(self.size, file )
             pickle.dump(self.autoupdate, file)
             file.close()
             self.setup_autoupdate()
@@ -507,21 +562,26 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
                 remove(SOURCE)
 
     def load_config(self):
-            if isfile(CONFIGDIR+"widget"):
-                file = open(CONFIGDIR+"widget", "r")
-                self.feed_list = pickle.load( file )
+            if isfile(CONFIGDIR+"widget2"):
+                file = open(CONFIGDIR+"widget2", "r")
+                self.size = pickle.load( file )
                 self.autoupdate = pickle.load( file )
                 file.close()
                 self.setup_autoupdate()
-            elif isfile(CONFIGDIR+"feeds.db"):
-                db = sqlite3.connect(CONFIGDIR+"feeds.db")
-                feeds = db.execute("SELECT id, title FROM feeds;")
-            
-                for feed in feeds:
-                    self.feed_list[feed[0]] = feed[1]
-                self.autoupdate = 0
+            elif isfile(CONFIGDIR+"widget"):
+                file = open(CONFIGDIR+"widget", "r")
+                feed_list = pickle.load( file )
+                self.autoupdate = pickle.load( file )
+                file.close()
+                self.setup_autoupdate()
+                self.size = 1
+                self.save_config()
+                remove(CONFIGDIR+"widget")
             else:
-                self.feed_list = None
+                #self.feed_list = None
+                self.autoupdate = 0
+                self.size = 1
+            self.initialized = True
 
 
 hd_plugin_type = FeedingItHomePlugin

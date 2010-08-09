@@ -33,6 +33,7 @@ import time
 import urllib2
 from BeautifulSoup import BeautifulSoup
 from urlparse import urljoin
+from calendar import timegm
 
 def getId(string):
     return md5.new(string).hexdigest()
@@ -78,9 +79,10 @@ class Feed:
             tmp=feedparser.parse(url, etag = etag, modified = modified, handlers = [proxy])
         expiry = float(expiryTime) * 3600.
 
-        currentTime = time.time()
+        currentTime = 0
         # Check if the parse was succesful (number of entries > 0, else do nothing)
         if len(tmp["entries"])>0:
+           currentTime = time.time()
            # The etag and modified value should only be updated if the content was not null
            try:
                etag = tmp["etag"]
@@ -120,8 +122,12 @@ class Feed:
                    entry["link"]
                except:
                    entry["link"] = ""
+               try:
+                   entry["author"]
+               except:
+                   entry["author"] = None
                tmpEntry = {"title":entry["title"], "content":self.extractContent(entry),
-                            "date":date, "link":entry["link"]}
+                            "date":date, "link":entry["link"], "author":entry["author"]}
                id = self.generateUniqueId(tmpEntry)
                
                #articleTime = time.mktime(self.entries[id]["dateTuple"])
@@ -147,6 +153,8 @@ class Feed:
                    self.db.execute("INSERT INTO feed (id, title, contentLink, date, updated, link, read) VALUES (?, ?, ?, ?, ?, ?, ?);", values)
                else:
                    try:
+                       self.db.execute("UPDATE feed SET updated=? WHERE id=?;", (currentTime, id) )
+                       self.db.commit()
                        filename = configdir+self.key+".d/"+id+".html"
                        file = open(filename,"a")
                        utime(filename, None)
@@ -161,35 +169,39 @@ class Feed:
            self.db.commit()
             
            
-           rows = self.db.execute("SELECT id FROM feed WHERE (read=0 AND updated<?) OR (read=1 AND updated<?);", (2*expiry, expiry))
-           for row in rows:
-               self.removeEntry(row[0])
-            
-           from glob import glob
-           from os import stat
-           for file in glob(configdir+self.key+".d/*"):
+        rows = self.db.execute("SELECT id FROM feed WHERE (read=0 AND updated<?) OR (read=1 AND updated<?);", (currentTime-2*expiry, currentTime-expiry))
+        for row in rows:
+           self.removeEntry(row[0])
+        
+        from glob import glob
+        from os import stat
+        for file in glob(configdir+self.key+".d/*"):
+            #
+            stats = stat(file)
+            #
+            # put the two dates into matching format
+            #
+            lastmodDate = stats[8]
+            #
+            expDate = time.time()-expiry*3
+            # check if image-last-modified-date is outdated
+            #
+            if expDate > lastmodDate:
                 #
-                stats = stat(file)
-                #
-                # put the two dates into matching format
-                #
-                lastmodDate = stats[8]
-                #
-                expDate = time.time()-expiry*3
-                # check if image-last-modified-date is outdated
-                #
-                if expDate > lastmodDate:
+                try:
                     #
-                    try:
-                        #
-                        #print 'Removing', file
-                        #
-                        remove(file) # commented out for testing
-                        #
-                    except OSError:
-                        #
-                        print 'Could not remove', file
-        return (currentTime, etag, modified)
+                    #print 'Removing', file
+                    #
+                    remove(file) # commented out for testing
+                    #
+                except OSError:
+                    #
+                    print 'Could not remove', file
+        updateTime = 0
+        rows = self.db.execute("SELECT MAX(date) FROM feed;")
+        for row in rows:
+            updateTime=row[0]
+        return (updateTime, etag, modified)
     
     def setEntryRead(self, id):
         self.db.execute("UPDATE feed SET read=1 WHERE id=?;", (id,) )
@@ -265,6 +277,7 @@ class Feed:
         content = entry["content"]
 
         link = entry['link']
+        author = entry['author']
         date = time.strftime("%a, %d %b %Y %H:%M:%S", time.localtime(entry["date"]) )
 
         #text = '''<div style="color: black; background-color: white;">'''
@@ -273,6 +286,8 @@ class Feed:
         text += '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>\n'
         #text += '<style> body {-webkit-user-select: none;} </style>'
         text += '</head><body><div><a href=\"' + link + '\">' + title + "</a>"
+        if author != None:
+            text += "<BR /><small><i>Author: " + author + "</i></small>"
         text += "<BR /><small><i>Date: " + date + "</i></small></div>"
         text += "<BR /><BR />"
         text += content
@@ -291,9 +306,9 @@ class Feed:
     
     def extractDate(self, entry):
         if entry.has_key("updated_parsed"):
-            return time.mktime(entry["updated_parsed"])
+            return timegm(entry["updated_parsed"])
         elif entry.has_key("published_parsed"):
-            return time.mktime(entry["published_parsed"])
+            return timegm(entry["published_parsed"])
         else:
             return 0
         
@@ -327,9 +342,10 @@ class ArchivedArticles(Feed):
         self.db.commit()
 
     def updateFeed(self, configdir, url, etag, modified, expiryTime=24, proxy=None, imageCache=False):
-        currentTime = time.time()
+        currentTime = 0
         rows = self.db.execute("SELECT id, link FROM feed WHERE updated=0;")
         for row in rows:
+            currentTime = time.time()
             id = row[0]
             link = row[1]
             f = urllib2.urlopen(link)
@@ -357,7 +373,7 @@ class ArchivedArticles(Feed):
         #ids = self.getIds()
         for row in rows:
             self.removeArticle(row[0])
-                
+
     def removeArticle(self, id):
         rows = self.db.execute("SELECT imagePath FROM images WHERE id=?;", (id,) )
         for row in rows:
@@ -377,15 +393,22 @@ class Listing:
         self.db = sqlite3.connect("%s/feeds.db" % self.configdir)
         
         try:
-            self.db.execute("create table feeds(id text, url text, title text, unread int, updateTime float, rank int, etag text, modified text);")
-            if isfile(self.configdir+"feeds.pickle"):
-                self.importOldFormatFeeds()
+            table = self.db.execute("SELECT sql FROM sqlite_master").fetchone()
+            if table == None:
+                self.db.execute("CREATE TABLE feeds(id text, url text, title text, unread int, updateTime float, rank int, etag text, modified text, widget int);")
+                if isfile(self.configdir+"feeds.pickle"):
+                    self.importOldFormatFeeds()
+                else:
+                    self.addFeed("Maemo News", "http://maemo.org/news/items.xml")    
             else:
-                self.addFeed("Maemo News", "http://maemo.org/news/items.xml")
+                from string import find, upper
+                if find(upper(table[0]), "WIDGET")<0:
+                    self.db.execute("ALTER TABLE feeds ADD COLUMN (widget int);")
+                    self.db.execute("UPDATE feeds SET widget=1;")
+                    self.db.commit()
         except:
-            # Table already created
             pass
-        
+
     def importOldFormatFeeds(self):
         """This function loads feeds that are saved in an outdated format, and converts them to sqlite"""
         import rss
@@ -394,8 +417,8 @@ class Listing:
         for id in listing.getListOfFeeds():
             try:
                 rank += 1
-                values = (id, listing.getFeedTitle(id) , listing.getFeedUrl(id), 0, time.time(), rank, None, "None")
-                self.db.execute("INSERT INTO feeds (id, title, url, unread, updateTime, rank, etag, modified) VALUES (?, ?, ? ,? ,? ,?, ?, ?);", values)
+                values = (id, listing.getFeedTitle(id) , listing.getFeedUrl(id), 0, time.time(), rank, None, "None", 1)
+                self.db.execute("INSERT INTO feeds (id, title, url, unread, updateTime, rank, etag, modified, widget) VALUES (?, ?, ? ,? ,? ,?, ?, ?, ?);", values)
                 self.db.commit()
                 
                 feed = listing.getFeed(id)
@@ -408,7 +431,7 @@ class Listing:
                             read_status = 1
                         else:
                             read_status = 0 
-                        date = time.mktime(feed.getDateTuple(item))
+                        date = timegm(feed.getDateTuple(item))
                         title = feed.getTitle(item)
                         newId = new_feed.generateUniqueId({"date":date, "title":title})
                         values = (newId, title , feed.getContentLink(item), date, time.time(), feed.getExternalLink(item), read_status)
@@ -440,13 +463,16 @@ class Listing:
         archFeed = self.getFeed("ArchivedArticles")
         archFeed.addArchivedArticle(title, link, date, self.configdir)
         self.updateUnread("ArchivedArticles")
-            
+        
     def updateFeed(self, key, expiryTime=24, proxy=None, imageCache=False):
         feed = self.getFeed(key)
         db = sqlite3.connect("%s/feeds.db" % self.configdir)
         (url, etag, modified) = db.execute("SELECT url, etag, modified FROM feeds WHERE id=?;", (key,) ).fetchone()
         (updateTime, etag, modified) = feed.updateFeed(self.configdir, url, etag, eval(modified), expiryTime, proxy, imageCache)
-        db.execute("UPDATE feeds SET updateTime=?, etag=?, modified=? WHERE id=?;", (updateTime, etag, str(modified), key) )
+        if updateTime > 0:
+            db.execute("UPDATE feeds SET updateTime=?, etag=?, modified=? WHERE id=?;", (updateTime, etag, str(modified), key) )
+        else:
+            db.execute("UPDATE feeds SET etag=?, modified=? WHERE id=?;", (etag, str(modified), key) )
         db.commit()
         self.updateUnread(key, db=db)
         
@@ -528,8 +554,8 @@ class Listing:
             max_rank = self.db.execute("SELECT MAX(rank) FROM feeds;").fetchone()[0]
             if max_rank == None:
                 max_rank = 0
-            values = (id, title, url, 0, 0, max_rank+1, None, "None")
-            self.db.execute("INSERT INTO feeds (id, title, url, unread, updateTime, rank, etag, modified) VALUES (?, ?, ? ,? ,? ,?, ?, ?);", values)
+            values = (id, title, url, 0, 0, max_rank+1, None, "None", 1)
+            self.db.execute("INSERT INTO feeds (id, title, url, unread, updateTime, rank, etag, modified, widget) VALUES (?, ?, ? ,? ,? ,?, ?, ?, ?);", values)
             self.db.commit()
             # Ask for the feed object, it will create the necessary tables
             self.getFeed(id)

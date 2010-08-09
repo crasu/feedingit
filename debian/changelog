@@ -1,3 +1,17 @@
+feedingit (0.8.0-5) unstable; urgency=low
+
+  * Fixed feed listing background colour
+  * Added author item in articles
+  * Fixed dates of articles/feeds
+
+ -- Yves <yves@marcoz.org>  Sun, 8 Aug 2010 19:03:19 -0800
+
+feedingit (0.8.0-4) unstable; urgency=low
+
+  * Created widget option for small/large size
+
+ -- Yves <yves@marcoz.org>  Mon, 19 Jul 2010 23:12:19 -0800
+
 feedingit (0.8.0-3) unstable; urgency=low
 
   * Updated feed/article cell size in widget
