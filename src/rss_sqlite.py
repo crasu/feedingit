@@ -403,7 +403,7 @@ class Listing:
             else:
                 from string import find, upper
                 if find(upper(table[0]), "WIDGET")<0:
-                    self.db.execute("ALTER TABLE feeds ADD COLUMN (widget int);")
+                    self.db.execute("ALTER TABLE feeds ADD COLUMN widget int;")
                     self.db.execute("UPDATE feeds SET widget=1;")
                     self.db.commit()
         except:
