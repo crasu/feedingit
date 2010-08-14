@@ -1,3 +1,16 @@
+feedingit (0.8.0-7) unstable; urgency=low
+
+  * Fixed widget typo
+
+ -- Yves <yves@marcoz.org>  Tue, 10 Aug 2010 11:49:19 -0800
+
+feedingit (0.8.0-6) unstable; urgency=low
+
+  * Fixed feed listing background colour in widget
+  * Fixed database upgrade bug when not using the widget
+
+ -- Yves <yves@marcoz.org>  Tue, 10 Aug 2010 07:35:19 -0800
+
 feedingit (0.8.0-5) unstable; urgency=low
 
   * Fixed feed listing background colour

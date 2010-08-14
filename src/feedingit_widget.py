@@ -49,8 +49,13 @@ color_style = gtk.rc_get_style_by_paths( settings, 'GtkButton', 'osso-logical-co
 active_color = color_style.lookup_color('ActiveTextColor')
 default_color = color_style.lookup_color('DefaultTextColor')
 font_desc = gtk.rc_get_style_by_paths(settings, 'HomeSystemFont', None, None).font_desc
+bg_color = color_style.lookup_color('DefaultBackgroundColor').to_string()
+c1=hex(min(int(bg_color[1:5],16)+10000, 65535))[2:6]
+c2=hex(min(int(bg_color[5:9],16)+10000, 65535))[2:6]
+c3=hex(min(int(bg_color[9:],16)+10000, 65535))[2:6]
+bg_color = "#" + c1 + c2 + c3
 
-del color_style
+del color_style, c1, c2, c3, settings
 
 CONFIGDIR="/home/user/.feedingit/"
 SOURCE=CONFIGDIR + "source"
@@ -170,12 +175,12 @@ class FeedingItHomePlugin(hildondesktop.HomePluginItem):
         self.update_list()
         name_renderer = gtk.CellRendererText()
         name_renderer.set_property("font-desc", font_desc)
-        name_renderer.set_property('background', "#333333")
+        name_renderer.set_property('background', bg_color) #"#333333")
         name_renderer.set_property('ellipsize', ELLIPSIZE_END)
         self.unread_renderer = gtk.CellRendererText()
         self.unread_renderer.set_property("font-desc", font_desc)
         self.unread_renderer.set_property("xalign", 1.0)
-        self.unread_renderer.set_property('background', "#333333")
+        self.unread_renderer.set_property('background', bg_color) # "#333333")
         column_unread = gtk.TreeViewColumn('Unread Items', self.unread_renderer, text = 1)
         column_unread.set_expand(False)
         column_name = gtk.TreeViewColumn('Feed Name', name_renderer, markup = 0)
