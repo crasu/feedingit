@@ -1,3 +1,9 @@
+feedingit (0.8.0-8) unstable; urgency=low
+
+  * Fixed change reverted by -7
+
+ -- Yves <yves@marcoz.org>  Fri, 13 Aug 2010 21:59:19 -0800
+
 feedingit (0.8.0-7) unstable; urgency=low
 
   * Fixed widget typo
