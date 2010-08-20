@@ -33,7 +33,7 @@ from urllib2 import ProxyHandler
 VERSION = "52"
 
 section = "FeedingIt"
-ranges = { "updateInterval":[0.5, 1, 2, 4, 12, 24], "expiry":[24, 48, 72], "fontSize":range(12,24), "orientation":["Automatic", "Landscape", "Portrait"], "artFontSize":[10, 12, 14, 16, 18, 20], "feedsort":["Manual", "Most unread", "Least unread", "Most recent", "Least recent"] }
+ranges = { "updateInterval":[0.5, 1, 2, 4, 12, 24], "expiry":[24, 48, 72, 144, 288], "fontSize":range(12,24), "orientation":["Automatic", "Landscape", "Portrait"], "artFontSize":[10, 12, 14, 16, 18, 20], "feedsort":["Manual", "Most unread", "Least unread", "Most recent", "Least recent"] }
 titles = {"updateInterval":"Auto-update interval", "expiry":"Delete articles", "fontSize":"List font size", "orientation":"Display orientation", "artFontSize":"Article font size","feedsort":"Feed sort order"}
 subtitles = {"updateInterval":"Every %s hours", "expiry":"After %s hours", "fontSize":"%s pixels", "orientation":"%s", "artFontSize":"%s pixels", "feedsort":"%s"}
 
