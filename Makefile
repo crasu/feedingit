@@ -43,7 +43,7 @@ install:
 	
 	
 clean:
-	rm src/*pyo
+	-rm src/*pyo
 	
 sourcepkg:
 	dpkg-buildpackage -rfakeroot -sa -S -i -I.git
