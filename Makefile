@@ -46,4 +46,4 @@ clean:
 	-rm src/*pyo
 	
 sourcepkg:
-	dpkg-buildpackage -rfakeroot -sa -S -i -I.git
+	dpkg-buildpackage -rfakeroot -sa -S -i -us -uc -I.git
