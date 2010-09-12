@@ -309,6 +309,8 @@ class Feed:
             return timegm(entry["updated_parsed"])
         elif entry.has_key("published_parsed"):
             return timegm(entry["published_parsed"])
+        elif entry.has_key("time"):
+            return timegm(entry["time"])
         else:
             return time.time()
         
