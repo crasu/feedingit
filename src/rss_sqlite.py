@@ -310,7 +310,7 @@ class Feed:
         elif entry.has_key("published_parsed"):
             return timegm(entry["published_parsed"])
         else:
-            return 0
+            return time.time()
         
     def extractContent(self, entry):
         content = ""
