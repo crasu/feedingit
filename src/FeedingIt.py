@@ -151,9 +151,12 @@ def unescape(text):
 
 
 class AddWidgetWizard(gtk.Dialog):
-    def __init__(self, parent, urlIn, titleIn=None, isEdit=False):
+    def __init__(self, parent, listing, urlIn, categories, titleIn=None, isEdit=False, currentCat=1):
         gtk.Dialog.__init__(self)
         self.set_transient_for(parent)
+        
+        #self.category = categories[0]
+        self.category = currentCat
 
         if isEdit:
             self.set_title('Edit RSS feed')
@@ -179,7 +182,7 @@ class AddWidgetWizard(gtk.Dialog):
         self.urlEntry.select_region(-1, -1)
         self.urlEntry.set_activates_default(True)
 
-        self.table = gtk.Table(2, 2, False)
+        self.table = gtk.Table(3, 2, False)
         self.table.set_col_spacings(5)
         label = gtk.Label('Name:')
         label.set_alignment(1., .5)
@@ -189,24 +192,83 @@ class AddWidgetWizard(gtk.Dialog):
         label.set_alignment(1., .5)
         self.table.attach(label, 0, 1, 1, 2, gtk.FILL)
         self.table.attach(self.urlEntry, 1, 2, 1, 2)
+        selector = self.create_selector(categories, listing)
+        picker = hildon.PickerButton(gtk.HILDON_SIZE_FINGER_HEIGHT, hildon.BUTTON_ARRANGEMENT_VERTICAL)
+        picker.set_selector(selector)
+        picker.set_title("Select category")
+        #picker.set_text(listing.getCategoryTitle(self.category), None) #, "Subtitle")
+        picker.set_name('HildonButton-finger')
+        picker.set_alignment(0,0,1,1)
+        
+        self.table.attach(picker, 0, 2, 2, 3, gtk.FILL)
+        
         self.vbox.pack_start(self.table)
 
         self.show_all()
 
     def getData(self):
-        return (self.nameEntry.get_text(), self.urlEntry.get_text())
+        return (self.nameEntry.get_text(), self.urlEntry.get_text(), self.category)
+    
+    def create_selector(self, choices, listing):
+        #self.pickerDialog = hildon.PickerDialog(self.parent)
+        selector = hildon.TouchSelector(text=True)
+        index = 0
+        self.map = {}
+        for item in choices:
+            title = listing.getCategoryTitle(item)
+            iter = selector.append_text(str(title))
+            if self.category == item: 
+                selector.set_active(0, index)
+            self.map[title] = item
+            index += 1
+        selector.connect("changed", self.selection_changed)
+        #self.pickerDialog.set_selector(selector)
+        return selector
 
-    def some_page_func(self, nb, current, userdata):
-        # Validate data for 1st page
-        if current == 0:
-            return len(self.nameEntry.get_text()) != 0
-        elif current == 1:
-            # Check the url is not null, and starts with http
-            return ( (len(self.urlEntry.get_text()) != 0) and (self.urlEntry.get_text().lower().startswith("http")) )
-        elif current != 2:
-            return False
+    def selection_changed(self, selector, button):
+        current_selection = selector.get_current_text()
+        if current_selection:
+            self.category = self.map[current_selection]
+
+class AddCategoryWizard(gtk.Dialog):
+    def __init__(self, parent, titleIn=None, isEdit=False):
+        gtk.Dialog.__init__(self)
+        self.set_transient_for(parent)
+
+        if isEdit:
+            self.set_title('Edit Category')
         else:
-            return True
+            self.set_title('Add Category')
+
+        if isEdit:
+            self.btn_add = self.add_button('Save', 2)
+        else:
+            self.btn_add = self.add_button('Add', 2)
+
+        self.set_default_response(2)
+
+        self.nameEntry = hildon.Entry(gtk.HILDON_SIZE_AUTO)
+        self.nameEntry.set_placeholder('Category name')
+        if not titleIn == None:
+            self.nameEntry.set_text(titleIn)
+            self.nameEntry.select_region(-1, -1)
+
+        self.table = gtk.Table(1, 2, False)
+        self.table.set_col_spacings(5)
+        label = gtk.Label('Name:')
+        label.set_alignment(1., .5)
+        self.table.attach(label, 0, 1, 0, 1, gtk.FILL)
+        self.table.attach(self.nameEntry, 1, 2, 0, 1)
+        #label = gtk.Label('URL:')
+        #label.set_alignment(1., .5)
+        #self.table.attach(label, 0, 1, 1, 2, gtk.FILL)
+        #self.table.attach(self.urlEntry, 1, 2, 1, 2)
+        self.vbox.pack_start(self.table)
+
+        self.show_all()
+
+    def getData(self):
+        return self.nameEntry.get_text()
         
 class Download(Thread):
     def __init__(self, listing, key, config):
@@ -293,14 +355,21 @@ class DownloadBar(gtk.ProgressBar):
     
     
 class SortList(hildon.StackableWindow):
-    def __init__(self, parent, listing, feedingit, after_closing):
+    def __init__(self, parent, listing, feedingit, after_closing, category=None):
         hildon.StackableWindow.__init__(self)
         self.set_transient_for(parent)
-        self.set_title('Subscriptions')
+        if category:
+            self.isEditingCategories = False
+            self.category = category
+            self.set_title(listing.getCategoryTitle(category))
+        else:
+            self.isEditingCategories = True
+            self.set_title('Categories')
         self.listing = listing
         self.feedingit = feedingit
         self.after_closing = after_closing
-        self.connect('destroy', lambda w: self.after_closing())
+        if after_closing:
+            self.connect('destroy', lambda w: self.after_closing())
         self.vbox2 = gtk.VBox(False, 2)
 
         button = hildon.GtkButton(gtk.HILDON_SIZE_FINGER_HEIGHT)
@@ -378,10 +447,16 @@ class SortList(hildon.StackableWindow):
         #rect = self.treeview.get_visible_rect()
         #y = rect.y+rect.height
         self.treestore = gtk.ListStore(gobject.TYPE_STRING, gobject.TYPE_STRING)
-        for key in self.listing.getListOfFeeds():
-            item = self.treestore.append([self.listing.getFeedTitle(key), key])
-            if key == selected:
-                selectedItem = item
+        if self.isEditingCategories:
+            for key in self.listing.getListOfCategories():
+                item = self.treestore.append([self.listing.getCategoryTitle(key), key])
+                if key == selected:
+                    selectedItem = item
+        else:
+            for key in self.listing.getListOfFeeds(category=self.category):
+                item = self.treestore.append([self.listing.getFeedTitle(key), key])
+                if key == selected:
+                    selectedItem = item
         self.treeview.set_model(self.treestore)
         if not selected == None:
             self.treeview.get_selection().select_iter(selectedItem)
@@ -410,13 +485,19 @@ class SortList(hildon.StackableWindow):
     def buttonUp(self, button):
         key  = self.getSelectedItem()
         if not key == None:
-            self.listing.moveUp(key)
+            if self.isEditingCategories:
+                self.listing.moveCategoryUp(key)
+            else:
+                self.listing.moveUp(key)
             self.refreshList(key, -10)
 
     def buttonDown(self, button):
         key = self.getSelectedItem()
         if not key == None:
-            self.listing.moveDown(key)
+            if self.isEditingCategories:
+                self.listing.moveCategoryDown(key)
+            else:
+                self.listing.moveDown(key)
             self.refreshList(key, 10)
 
     def buttonDelete(self, button):
@@ -427,7 +508,10 @@ class SortList(hildon.StackableWindow):
         response = dlg.run()
         dlg.destroy()
         if response == gtk.RESPONSE_OK:
-            self.listing.removeFeed(key)
+            if self.isEditingCategories:
+                self.listing.removeCategory(key)
+            else:
+                self.listing.removeFeed(key)
             self.refreshList()
 
     def buttonEdit(self, button):
@@ -437,27 +521,38 @@ class SortList(hildon.StackableWindow):
             message = 'Cannot edit the archived articles feed.'
             hildon.hildon_banner_show_information(self, '', message)
             return
-
-        if key is not None:
-            wizard = AddWidgetWizard(self, self.listing.getFeedUrl(key), self.listing.getFeedTitle(key), True)
-            ret = wizard.run()
-            if ret == 2:
-                (title, url) = wizard.getData()
-                if (not title == '') and (not url == ''):
-                    self.listing.editFeed(key, title, url)
-                    self.refreshList()
-            wizard.destroy()
+        if self.isEditingCategories:
+            if key is not None:
+                SortList(self.parent, self.listing, self.feedingit, None, category=key)
+        else:
+            if key is not None:
+                wizard = AddWidgetWizard(self, self.listing, self.listing.getFeedUrl(key), self.listing.getListOfCategories(), self.listing.getFeedTitle(key), True, currentCat=self.category)
+                ret = wizard.run()
+                if ret == 2:
+                    (title, url, category) = wizard.getData()
+                    if (not title == '') and (not url == ''):
+                        self.listing.editFeed(key, title, url, category=category)
+                        self.refreshList()
+                wizard.destroy()
 
     def buttonDone(self, *args):
         self.destroy()
         
     def buttonAdd(self, button, urlIn="http://"):
-        wizard = AddWidgetWizard(self, urlIn)
-        ret = wizard.run()
-        if ret == 2:
-            (title, url) = wizard.getData()
-            if (not title == '') and (not url == ''): 
-               self.listing.addFeed(title, url)
+        if self.isEditingCategories:
+            wizard = AddCategoryWizard(self)
+            ret = wizard.run()
+            if ret == 2:
+                title = wizard.getData()
+                if (not title == ''): 
+                   self.listing.addCategory(title)
+        else:
+            wizard = AddWidgetWizard(self, self.listing, urlIn, self.listing.getListOfCategories())
+            ret = wizard.run()
+            if ret == 2:
+                (title, url, category) = wizard.getData()
+                if (not title == '') and (not url == ''): 
+                   self.listing.addFeed(title, url, category=category)
         wizard.destroy()
         self.refreshList()
                
@@ -893,6 +988,8 @@ class FeedingIt:
         gobject.idle_add(self.createWindow)
         
     def createWindow(self):
+        self.category = 0
+        
         self.app_lock = get_lock("app_lock")
         if self.app_lock == None:
             try:
@@ -958,9 +1055,11 @@ class FeedingIt:
         #self.articleWindow = hildon.StackableWindow()
         self.introLabel.destroy()
         self.pannableListing = hildon.PannableArea()
-        self.feedItems = gtk.ListStore(gtk.gdk.Pixbuf, str, str)
+        self.feedItems = gtk.TreeStore(gtk.gdk.Pixbuf, str, str)
         self.feedList = gtk.TreeView(self.feedItems)
         self.feedList.connect('row-activated', self.on_feedList_row_activated)
+        #self.feedList.set_enable_tree_lines(True)                                                                                           
+        #self.feedList.set_show_expanders(True)
         self.pannableListing.add(self.feedList)
 
         icon_renderer = gtk.CellRendererPixbuf()
@@ -979,6 +1078,7 @@ class FeedingIt:
         self.displayListing()
         self.autoupdate = False
         self.checkAutoUpdate()
+        
         hildon.hildon_gtk_window_set_progress_indicator(self.window, 0)
         gobject.idle_add(self.enableDbus)
         
@@ -1027,7 +1127,7 @@ class FeedingIt:
         self.displayListing()
 
     def addFeed(self, urlIn="http://"):
-        wizard = AddWidgetWizard(self.window, urlIn)
+        wizard = AddWidgetWizard(self.window, self.listing, urlIn, self.listing.getListOfCategories())
         ret = wizard.run()
         if ret == 2:
             (title, url) = wizard.getData()
@@ -1072,42 +1172,106 @@ class FeedingIt:
         else:
             return False
         
+    def saveExpandedLines(self):
+       self.expandedLines = []
+       model = self.feedList.get_model()
+       model.foreach(self.checkLine)
+
+    def checkLine(self, model, path, iter, data = None):
+       if self.feedList.row_expanded(path):
+           self.expandedLines.append(path)
+
+    def restoreExpandedLines(self):
+       model = self.feedList.get_model()
+       model.foreach(self.restoreLine)
+
+    def restoreLine(self, model, path, iter, data = None):
+       if path in self.expandedLines:
+           self.feedList.expand_row(path, False)
+        
     def displayListing(self):
         icon_theme = gtk.icon_theme_get_default()
         default_pixbuf = icon_theme.load_icon(ABOUT_ICON, LIST_ICON_SIZE, \
                 gtk.ICON_LOOKUP_USE_BUILTIN)
 
+        self.saveExpandedLines()
+
         self.feedItems.clear()
         hideReadFeed = self.config.getHideReadFeeds()
         order = self.config.getFeedSortOrder()
-        keys = self.listing.getSortedListOfKeys(order, onlyUnread=hideReadFeed)
-
-        for key in keys:
-            unreadItems = self.listing.getFeedNumberOfUnreadItems(key)
-            title = xml.sax.saxutils.escape(self.listing.getFeedTitle(key))
-            updateTime = self.listing.getFeedUpdateTime(key)
-            if updateTime == 0:
-                updateTime = "Never"
-            subtitle = '%s / %d unread items' % (updateTime, unreadItems)
-            if unreadItems:
-                markup = FEED_TEMPLATE_UNREAD % (title, subtitle)
-            else:
-                markup = FEED_TEMPLATE % (title, subtitle)
+        
+        categories = self.listing.getListOfCategories()
+        if len(categories) > 1:
+            showCategories = True
+        else:
+            showCategories = False
+        
+        for categoryId in categories:
+        
+            title = self.listing.getCategoryTitle(categoryId)
+            keys = self.listing.getSortedListOfKeys(order, onlyUnread=hideReadFeed, category=categoryId)
+            
+            if showCategories and len(keys)>0:
+                category = self.feedItems.append(None, (None, title, categoryId))
+                #print "catID" + str(categoryId) + " " + str(self.category)
+                if categoryId == self.category:
+                    #print categoryId
+                    expandedRow = category
     
-            try:
-                icon_filename = self.listing.getFavicon(key)
-                pixbuf = gtk.gdk.pixbuf_new_from_file_at_size(icon_filename, \
-                                               LIST_ICON_SIZE, LIST_ICON_SIZE)
-            except:
-                pixbuf = default_pixbuf
-    
-            self.feedItems.append((pixbuf, markup, key))
+            for key in keys:
+                unreadItems = self.listing.getFeedNumberOfUnreadItems(key)
+                title = xml.sax.saxutils.escape(self.listing.getFeedTitle(key))
+                updateTime = self.listing.getFeedUpdateTime(key)
+                if updateTime == 0:
+                    updateTime = "Never"
+                subtitle = '%s / %d unread items' % (updateTime, unreadItems)
+                if unreadItems:
+                    markup = FEED_TEMPLATE_UNREAD % (title, subtitle)
+                else:
+                    markup = FEED_TEMPLATE % (title, subtitle)
+        
+                try:
+                    icon_filename = self.listing.getFavicon(key)
+                    pixbuf = gtk.gdk.pixbuf_new_from_file_at_size(icon_filename, \
+                                                   LIST_ICON_SIZE, LIST_ICON_SIZE)
+                except:
+                    pixbuf = default_pixbuf
+                
+                if showCategories:
+                    self.feedItems.append(category, (pixbuf, markup, key))
+                else:
+                    self.feedItems.append(None, (pixbuf, markup, key))
+                    
+                
+        self.restoreExpandedLines()
+        #try:
+            
+        #    self.feedList.expand_row(self.feeItems.get_path(expandedRow), True)
+        #except:
+        #    pass
 
     def on_feedList_row_activated(self, treeview, path, column):
         model = treeview.get_model()
         iter = model.get_iter(path)
         key = model.get_value(iter, COLUMN_KEY)
-        self.openFeed(key)
+        
+        try:
+            #print "Key: " + str(key)
+            catId = int(key)
+            self.category = catId
+            if treeview.row_expanded(path):
+                treeview.collapse_row(path)
+        #else:
+        #    treeview.expand_row(path, True)
+            #treeview.collapse_all()
+            #treeview.expand_row(path, False)
+            #for i in range(len(path)):
+            #    self.feedList.expand_row(path[:i+1], False)
+            #self.show_confirmation_note(self.window, "Working")
+            #return True
+        except:
+            if key:
+                self.openFeed(key)
             
     def openFeed(self, key):
         try:

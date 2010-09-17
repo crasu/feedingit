@@ -1,3 +1,9 @@
+feedingit (0.8.0-9) unstable; urgency=low
+
+  * Fixed date for articles without a date field
+
+ -- Yves <yves@marcoz.org>  Fri, 12 Sep 2010 10:54:19 -0800
+
 feedingit (0.8.0-8) unstable; urgency=low
 
   * Fixed change reverted by -7

@@ -395,7 +395,9 @@ class Listing:
         try:
             table = self.db.execute("SELECT sql FROM sqlite_master").fetchone()
             if table == None:
-                self.db.execute("CREATE TABLE feeds(id text, url text, title text, unread int, updateTime float, rank int, etag text, modified text, widget int);")
+                self.db.execute("CREATE TABLE feeds(id text, url text, title text, unread int, updateTime float, rank int, etag text, modified text, widget int, category int);")
+                self.db.execute("CREATE TABLE categories(id text, title text, unread int, rank int);")
+                self.addCategory("Default Category")
                 if isfile(self.configdir+"feeds.pickle"):
                     self.importOldFormatFeeds()
                 else:
@@ -405,6 +407,12 @@ class Listing:
                 if find(upper(table[0]), "WIDGET")<0:
                     self.db.execute("ALTER TABLE feeds ADD COLUMN widget int;")
                     self.db.execute("UPDATE feeds SET widget=1;")
+                    self.db.commit()
+                if find(upper(table[0]), "CATEGORY")<0:
+                    self.db.execute("CREATE TABLE categories(id text, title text, unread int, rank int);")
+                    self.addCategory("Default Category")
+                    self.db.execute("ALTER TABLE feeds ADD COLUMN category int;")
+                    self.db.execute("UPDATE feeds SET category=1;")
                     self.db.commit()
         except:
             pass
@@ -418,7 +426,7 @@ class Listing:
             try:
                 rank += 1
                 values = (id, listing.getFeedTitle(id) , listing.getFeedUrl(id), 0, time.time(), rank, None, "None", 1)
-                self.db.execute("INSERT INTO feeds (id, title, url, unread, updateTime, rank, etag, modified, widget) VALUES (?, ?, ? ,? ,? ,?, ?, ?, ?);", values)
+                self.db.execute("INSERT INTO feeds (id, title, url, unread, updateTime, rank, etag, modified, widget, category) VALUES (?, ?, ? ,? ,? ,?, ?, ?, ?, 1);", values)
                 self.db.commit()
                 
                 feed = listing.getFeed(id)
@@ -481,8 +489,11 @@ class Listing:
             return ArchivedArticles(self.configdir, key)
         return Feed(self.configdir, key)
         
-    def editFeed(self, key, title, url):
-        self.db.execute("UPDATE feeds SET title=?, url=? WHERE id=?;", (title, url, key))
+    def editFeed(self, key, title, url, category=None):
+        if category:
+            self.db.execute("UPDATE feeds SET title=?, url=?, category=? WHERE id=?;", (title, url, category, key))
+        else:
+            self.db.execute("UPDATE feeds SET title=?, url=? WHERE id=?;", (title, url, key))
         self.db.commit()
         
     def getFeedUpdateTime(self, key):
@@ -497,15 +508,31 @@ class Listing:
     def getFeedUrl(self, key):
         return self.db.execute("SELECT url FROM feeds WHERE id=?;", (key,)).fetchone()[0]
         
-    def getListOfFeeds(self):
-        rows = self.db.execute("SELECT id FROM feeds ORDER BY rank;" )
+    def getListOfFeeds(self, category=None):
+        if category:
+            rows = self.db.execute("SELECT id FROM feeds WHERE category=? ORDER BY rank;", (category, ) )
+        else:
+            rows = self.db.execute("SELECT id FROM feeds ORDER BY rank;" )
         keys = []
         for row in rows:
             if row[0]:
                 keys.append(row[0])
         return keys
     
-    def getSortedListOfKeys(self, order, onlyUnread=False):
+    def getListOfCategories(self):
+        rows = self.db.execute("SELECT id FROM categories ORDER BY rank;" )
+        keys = []
+        for row in rows:
+            if row[0]:
+                keys.append(row[0])
+        return keys
+    
+    def getCategoryTitle(self, id):
+        print id
+        row = self.db.execute("SELECT title FROM categories WHERE id=?;", (id, )).fetchone()
+        return row[0]
+    
+    def getSortedListOfKeys(self, order, onlyUnread=False, category=1):
         if   order == "Most unread":
             tmp = "ORDER BY unread DESC"
             #keyorder = sorted(feedInfo, key = lambda k: feedInfo[k][1], reverse=True)
@@ -522,9 +549,9 @@ class Listing:
             tmp = "ORDER BY rank"
             #keyorder = sorted(feedInfo, key = lambda k: feedInfo[k][0])
         if onlyUnread:
-            sql = "SELECT id FROM feeds WHERE unread>0 " + tmp
+            sql = "SELECT id FROM feeds WHERE unread>0 WHERE category=%s" %category + tmp 
         else:
-            sql = "SELECT id FROM feeds " + tmp
+            sql = "SELECT id FROM feeds WHERE category=%s " %category + tmp
         rows = self.db.execute(sql)
         keys = []
         for row in rows:
@@ -546,7 +573,7 @@ class Listing:
         db.execute("UPDATE feeds SET unread=? WHERE id=?;", (feed.getNumberOfUnreadItems(), key))
         db.commit()
 
-    def addFeed(self, title, url, id=None):
+    def addFeed(self, title, url, id=None, category=1):
         if not id:
             id = getId(title)
         count = self.db.execute("SELECT count(*) FROM feeds WHERE id=?;", (id,) ).fetchone()[0]
@@ -554,14 +581,24 @@ class Listing:
             max_rank = self.db.execute("SELECT MAX(rank) FROM feeds;").fetchone()[0]
             if max_rank == None:
                 max_rank = 0
-            values = (id, title, url, 0, 0, max_rank+1, None, "None", 1)
-            self.db.execute("INSERT INTO feeds (id, title, url, unread, updateTime, rank, etag, modified, widget) VALUES (?, ?, ? ,? ,? ,?, ?, ?, ?);", values)
+            values = (id, title, url, 0, 0, max_rank+1, None, "None", 1, category)
+            self.db.execute("INSERT INTO feeds (id, title, url, unread, updateTime, rank, etag, modified, widget, category) VALUES (?, ?, ? ,? ,? ,?, ?, ?, ?,?);", values)
             self.db.commit()
             # Ask for the feed object, it will create the necessary tables
             self.getFeed(id)
             return True
         else:
             return False
+        
+    def addCategory(self, title):
+        rank = self.db.execute("SELECT MAX(rank)+1 FROM categories;").fetchone()[0]
+        if rank==None:
+            rank=1
+        id = self.db.execute("SELECT MAX(id)+1 FROM categories;").fetchone()[0]
+        if id==None:
+            id=1
+        self.db.execute("INSERT INTO categories (id, title, unread, rank) VALUES (?, ?, 0, ?)", (id, title, rank))
+        self.db.commit()
     
     def removeFeed(self, key):
         rank = self.db.execute("SELECT rank FROM feeds WHERE id=?;", (key,) ).fetchone()[0]
@@ -571,7 +608,14 @@ class Listing:
 
         if isdir(self.configdir+key+".d/"):
            rmtree(self.configdir+key+".d/")
-        #self.saveConfig()
+           
+    def removeCategory(self, key):
+        if self.db.execute("SELECT count(*) FROM categories;").fetchone()[0] > 1:
+            rank = self.db.execute("SELECT rank FROM categories WHERE id=?;", (key,) ).fetchone()[0]
+            self.db.execute("DELETE FROM categories WHERE id=?;", (key, ))
+            self.db.execute("UPDATE categories SET rank=rank-1 WHERE rank>?;", (rank,) )
+            self.db.execute("UPDATE feeds SET category=1 WHERE category=?;", (key,) )
+            self.db.commit()
         
     #def saveConfig(self):
     #    self.listOfFeeds["feedingit-order"] = self.sortedKeys
@@ -585,6 +629,13 @@ class Listing:
             self.db.execute("UPDATE feeds SET rank=? WHERE rank=?;", (rank, rank-1) )
             self.db.execute("UPDATE feeds SET rank=? WHERE id=?;", (rank-1, key) )
             self.db.commit()
+            
+    def moveCategoryUp(self, key):
+        rank = self.db.execute("SELECT rank FROM categories WHERE id=?;", (key,)).fetchone()[0]
+        if rank>0:
+            self.db.execute("UPDATE categories SET rank=? WHERE rank=?;", (rank, rank-1) )
+            self.db.execute("UPDATE categories SET rank=? WHERE id=?;", (rank-1, key) )
+            self.db.commit()
         
     def moveDown(self, key):
         rank = self.db.execute("SELECT rank FROM feeds WHERE id=?;", (key,)).fetchone()[0]
@@ -594,5 +645,12 @@ class Listing:
             self.db.execute("UPDATE feeds SET rank=? WHERE id=?;", (rank+1, key) )
             self.db.commit()
             
+    def moveCategoryDown(self, key):
+        rank = self.db.execute("SELECT rank FROM categories WHERE id=?;", (key,)).fetchone()[0]
+        max_rank = self.db.execute("SELECT MAX(rank) FROM categories;").fetchone()[0]
+        if rank<max_rank:
+            self.db.execute("UPDATE categories SET rank=? WHERE rank=?;", (rank, rank+1) )
+            self.db.execute("UPDATE categories SET rank=? WHERE id=?;", (rank+1, key) )
+            self.db.commit()
             
         
