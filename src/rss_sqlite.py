@@ -70,6 +70,65 @@ class Feed:
             file.close()
         return filename
 
+    def processRetrievedEntry(self, entry, currentTime, configdir, imageCache):
+        ids = self.getIds()
+        date = self.extractDate(entry)
+        try:
+           entry["title"]
+        except:
+           entry["title"] = "No Title"
+        try:
+           entry["link"]
+        except:
+           entry["link"] = ""
+        try:
+           entry["author"]
+        except:
+           entry["author"] = None
+        if(entry.has_key("id")):
+           entry["id"] = None 
+        newEntry = {"title":entry["title"], "content":self.extractContent(entry),
+                    "date":date, "link":entry["link"], "author":entry["author"], "id":entry["id"]}
+        print id
+        id = self.generateUniqueId(newEntry)
+
+        if not id in ids:
+           soup = BeautifulSoup(self.getArticle(newEntry)) 
+           images = soup('img')
+           baseurl = newEntry["link"]
+           if imageCache:
+              for img in images:
+                  try:
+                    filename = self.addImage(configdir, self.key, baseurl, img['src'])
+                    img['src']=filename
+                    self.db.execute("INSERT INTO images (id, imagePath) VALUES (?, ?);", (id, filename) )
+                  except:
+                      import traceback
+                      traceback.print_exc()
+                      print "Error downloading image %s" % img
+           newEntry["contentLink"] = configdir+self.key+".d/"+id+".html"
+           file = open(newEntry["contentLink"], "w")
+           file.write(soup.prettify())
+           file.close()
+           values = (id, newEntry["title"], newEntry["contentLink"], newEntry["date"], currentTime, newEntry["link"], 0)
+           self.db.execute("INSERT INTO feed (id, title, contentLink, date, updated, link, read) VALUES (?, ?, ?, ?, ?, ?, ?);", values)
+        else:
+           try:
+               self.db.execute("UPDATE feed SET updated=? WHERE id=?;", (currentTime, id) )
+               self.db.commit()
+               filename = configdir+self.key+".d/"+id+".html"
+               file = open(filename,"a")
+               utime(filename, None)
+               file.close()
+               images = self.db.execute("SELECT imagePath FROM images where id=?;", (id, )).fetchall()
+               for image in images:
+                    file = open(image[0],"a")
+                    utime(image[0], None)
+                    file.close()
+           except:
+               pass
+        self.db.commit()
+
     def updateFeed(self, configdir, url, etag, modified, expiryTime=24, proxy=None, imageCache=False):
         # Expiry time is in hours
         if proxy == None:
@@ -104,69 +163,9 @@ class Feed:
                #traceback.print_exc()
                 pass
 
-
-           #reversedEntries = self.getEntries()
-           #reversedEntries.reverse()
-
-           ids = self.getIds()
-
            tmp["entries"].reverse()
            for entry in tmp["entries"]:
-               date = self.extractDate(entry)
-               try:
-                   entry["title"]
-               except:
-                   entry["title"] = "No Title"
-               try:
-                   entry["link"]
-               except:
-                   entry["link"] = ""
-               try:
-                   entry["author"]
-               except:
-                   entry["author"] = None
-               tmpEntry = {"title":entry["title"], "content":self.extractContent(entry),
-                            "date":date, "link":entry["link"], "author":entry["author"]}
-               id = self.generateUniqueId(tmpEntry)
-               
-               #articleTime = time.mktime(self.entries[id]["dateTuple"])
-               if not id in ids:
-                   soup = BeautifulSoup(self.getArticle(tmpEntry)) #tmpEntry["content"])
-                   images = soup('img')
-                   baseurl = tmpEntry["link"]
-                   if imageCache:
-                      for img in images:
-                          try:
-                            filename = self.addImage(configdir, self.key, baseurl, img['src'])
-                            img['src']=filename
-                            self.db.execute("INSERT INTO images (id, imagePath) VALUES (?, ?);", (id, filename) )
-                          except:
-                              import traceback
-                              traceback.print_exc()
-                              print "Error downloading image %s" % img
-                   tmpEntry["contentLink"] = configdir+self.key+".d/"+id+".html"
-                   file = open(tmpEntry["contentLink"], "w")
-                   file.write(soup.prettify())
-                   file.close()
-                   values = (id, tmpEntry["title"], tmpEntry["contentLink"], tmpEntry["date"], currentTime, tmpEntry["link"], 0)
-                   self.db.execute("INSERT INTO feed (id, title, contentLink, date, updated, link, read) VALUES (?, ?, ?, ?, ?, ?, ?);", values)
-               else:
-                   try:
-                       self.db.execute("UPDATE feed SET updated=? WHERE id=?;", (currentTime, id) )
-                       self.db.commit()
-                       filename = configdir+self.key+".d/"+id+".html"
-                       file = open(filename,"a")
-                       utime(filename, None)
-                       file.close()
-                       images = self.db.execute("SELECT imagePath FROM images where id=?;", (id, )).fetchall()
-                       for image in images:
-                            file = open(image[0],"a")
-                            utime(image[0], None)
-                            file.close()
-                   except:
-                       pass
-           self.db.commit()
-            
+                self.processRetrievedEntry(entry, currentTime, configdir, imageCache)
            
         rows = self.db.execute("SELECT id FROM feed WHERE (read=0 AND updated<?) OR (read=1 AND updated<?);", (currentTime-2*expiry, currentTime-expiry))
         for row in rows:
@@ -239,7 +238,10 @@ class Feed:
         return self.db.execute("SELECT date FROM feed WHERE id=?;", (id,) ).fetchone()[0]
     
     def generateUniqueId(self, entry):
-        return getId(str(entry["title"]))
+        if(entry.has_key("id")):
+            return getId(str(entry["id"]))
+        else:
+            return getId(str(entry["title"]))
     
     def getIds(self, onlyUnread=False):
         if onlyUnread:
