@@ -85,11 +85,11 @@ class Feed:
            entry["author"]
         except:
            entry["author"] = None
-        if(entry.has_key("id")):
+        if(not(entry.has_key("id"))):
            entry["id"] = None 
         newEntry = {"title":entry["title"], "content":self.extractContent(entry),
                     "date":date, "link":entry["link"], "author":entry["author"], "id":entry["id"]}
-        print id
+
         id = self.generateUniqueId(newEntry)
 
         if not id in ids:
@@ -161,7 +161,7 @@ class Feed:
            except:
                #import traceback
                #traceback.print_exc()
-                pass
+               pass
 
            tmp["entries"].reverse()
            for entry in tmp["entries"]:
