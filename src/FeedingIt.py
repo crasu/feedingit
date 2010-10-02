@@ -1130,9 +1130,9 @@ class FeedingIt:
         wizard = AddWidgetWizard(self.window, self.listing, urlIn, self.listing.getListOfCategories())
         ret = wizard.run()
         if ret == 2:
-            (title, url) = wizard.getData()
+            (title, url, category) = wizard.getData()
             if (not title == '') and (not url == ''): 
-               self.listing.addFeed(title, url)
+               self.listing.addFeed(title, url, category=category)
         wizard.destroy()
         self.displayListing()
 
