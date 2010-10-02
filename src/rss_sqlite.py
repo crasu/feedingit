@@ -240,7 +240,7 @@ class Feed:
         return self.db.execute("SELECT date FROM feed WHERE id=?;", (id,) ).fetchone()[0]
     
     def generateUniqueId(self, entry):
-        return getId(str(entry["date"]) + str(entry["title"]))
+        return getId(str(entry["title"]))
     
     def getIds(self, onlyUnread=False):
         if onlyUnread:
