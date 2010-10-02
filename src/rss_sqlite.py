@@ -65,7 +65,6 @@ class Feed:
             except:
                 print "Could not download " + url
         else:
-            #open(filename,"a").close()  # "Touch" the file
             file = open(filename,"a")
             utime(filename, None)
             file.close()
@@ -250,7 +249,6 @@ class Feed:
         ids = []
         for row in rows:
             ids.append(row[0])
-        #ids.reverse()
         return ids
     
     def getNextId(self, id):
@@ -372,7 +370,6 @@ class ArchivedArticles(Feed):
     
     def purgeReadArticles(self):
         rows = self.db.execute("SELECT id FROM feed WHERE read=1;")
-        #ids = self.getIds()
         for row in rows:
             self.removeArticle(row[0])
 
@@ -551,9 +548,9 @@ class Listing:
             tmp = "ORDER BY rank"
             #keyorder = sorted(feedInfo, key = lambda k: feedInfo[k][0])
         if onlyUnread:
-            sql = "SELECT id FROM feeds WHERE unread>0 WHERE category=%s" %category + tmp 
+            sql = "SELECT id FROM feeds WHERE unread>0 WHERE category=%s %s" % (category, tmp)
         else:
-            sql = "SELECT id FROM feeds WHERE category=%s " %category + tmp
+            sql = "SELECT id FROM feeds WHERE category=%s %s" % (category, tmp)
         rows = self.db.execute(sql)
         keys = []
         for row in rows:
