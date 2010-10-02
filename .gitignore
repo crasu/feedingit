@@ -1,1 +1,7 @@
 *.pyc
+build-stamp
+configure-stamp
+debian/feedingit
+*.log
+debian/feedingit.substvars
+debian/files
